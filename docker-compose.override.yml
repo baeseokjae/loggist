@@ -1,0 +1,18 @@
+# 개발용 오버라이드
+# docker compose up -d 시 자동 적용되어 Prometheus/Loki 포트를 호스트에 노출
+# loggist 앱은 비활성화 (로컬에서 pnpm dev로 실행)
+#
+# 프로덕션 배포 시: docker compose -f docker-compose.yml up -d
+
+services:
+  loggist:
+    profiles:
+      - production
+
+  prometheus:
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  loki:
+    ports:
+      - "127.0.0.1:3100:3100"

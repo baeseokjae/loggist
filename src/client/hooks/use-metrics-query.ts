@@ -1,0 +1,46 @@
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../lib/api-client";
+
+interface PrometheusResult {
+	data: {
+		resultType: string;
+		result: Array<{
+			metric: Record<string, string>;
+			value?: [number, string];
+			values?: [number, string][];
+		}>;
+	};
+}
+
+export function useMetricQuery(preset: string, profile = "all", range = "24h") {
+	return useQuery({
+		queryKey: ["metric", preset, profile, range],
+		queryFn: () =>
+			api.get<PrometheusResult>(
+				`/metrics/query?preset=${preset}&profile=${profile}&range=${range}`,
+			),
+		select: (res) => {
+			const value = res?.data?.result?.[0]?.value?.[1];
+			return value ? Number.parseFloat(value) : 0;
+		},
+		refetchInterval: 30_000,
+	});
+}
+
+export function useMetricRangeQuery(
+	preset: string,
+	start: string,
+	end: string,
+	step = "60",
+	profile = "all",
+) {
+	return useQuery({
+		queryKey: ["metric-range", preset, profile, start, end, step],
+		queryFn: () =>
+			api.get<PrometheusResult>(
+				`/metrics/query_range?preset=${preset}&profile=${profile}&start=${start}&end=${end}&step=${step}`,
+			),
+		select: (res) => res?.data?.result || [],
+		enabled: !!start && !!end,
+	});
+}
