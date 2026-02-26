@@ -1,6 +1,9 @@
-import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let db: Database.Database;
 
@@ -22,37 +25,8 @@ export function initDB(dbPath?: string): Database.Database {
 	db.pragma("journal_mode = WAL");
 	db.pragma("foreign_keys = ON");
 
-	db.exec(`
-CREATE TABLE IF NOT EXISTS budgets (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  profile TEXT NOT NULL DEFAULT 'all',
-  period TEXT NOT NULL CHECK(period IN ('daily', 'weekly', 'monthly')),
-  amount_usd REAL NOT NULL,
-  alert_threshold_pct INTEGER NOT NULL DEFAULT 80,
-  notify_method TEXT NOT NULL DEFAULT 'dashboard',
-  notify_url TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS budget_alerts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  budget_id INTEGER NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
-  triggered_at TEXT NOT NULL DEFAULT (datetime('now')),
-  current_amount_usd REAL NOT NULL,
-  threshold_pct INTEGER NOT NULL,
-  notified INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE INDEX IF NOT EXISTS idx_budget_alerts_budget_id ON budget_alerts(budget_id);
-CREATE INDEX IF NOT EXISTS idx_budget_alerts_triggered_at ON budget_alerts(triggered_at);
-
-CREATE TABLE IF NOT EXISTS settings (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL,
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-	`);
+	const schema = readFileSync(join(__dirname, "schema.sql"), "utf-8");
+	db.exec(schema);
 
 	return db;
 }

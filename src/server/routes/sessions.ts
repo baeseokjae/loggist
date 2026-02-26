@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { queryLokiRange } from "../services/loki";
+import type { SessionSummary } from "../../shared/types/domain";
+import type { LokiQueryResult } from "../../shared/types/loki";
 
 export const sessionsRoutes = new Hono();
 
@@ -62,14 +64,7 @@ interface LogEntry {
 
 function parseLogEntries(result: unknown): LogEntry[] {
 	const entries: LogEntry[] = [];
-	const r = result as {
-		data?: {
-			result?: Array<{
-				stream?: Record<string, string>;
-				values?: [string, string][];
-			}>;
-		};
-	};
+	const r = result as LokiQueryResult;
 	if (!r?.data?.result) return entries;
 
 	for (const stream of r.data.result) {
@@ -135,22 +130,11 @@ function parseLogEntries(result: unknown): LogEntry[] {
 	return entries.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 }
 
-interface SessionSummary {
-	sessionId: string;
-	startTime: string;
-	endTime: string;
-	totalCost: number;
-	totalInputTokens: number;
-	totalOutputTokens: number;
-	totalCacheTokens: number;
-	apiCalls: number;
-	toolCalls: number;
-	toolFailures: number;
-	models: string[];
+interface LocalSessionSummary extends SessionSummary {
 	durationMs: number;
 }
 
-function computeSessionSummary(events: LogEntry[]): SessionSummary {
+function computeSessionSummary(events: LogEntry[]): LocalSessionSummary {
 	const models = new Set<string>();
 	let totalCost = 0;
 	let totalInputTokens = 0;
@@ -194,7 +178,7 @@ function computeSessionSummary(events: LogEntry[]): SessionSummary {
 	};
 }
 
-function groupBySessions(result: unknown): SessionSummary[] {
+function groupBySessions(result: unknown): LocalSessionSummary[] {
 	const entries = parseLogEntries(result);
 	const sessionMap = new Map<string, LogEntry[]>();
 
@@ -204,7 +188,7 @@ function groupBySessions(result: unknown): SessionSummary[] {
 		sessionMap.get(sid)?.push(entry);
 	}
 
-	const summaries: SessionSummary[] = [];
+	const summaries: LocalSessionSummary[] = [];
 	for (const [, events] of sessionMap) {
 		summaries.push(computeSessionSummary(events));
 	}

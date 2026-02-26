@@ -1,12 +1,12 @@
 import { Hono } from "hono";
-import { getDB } from "../db/index";
+import { getQueries } from "../db/queries";
 
 export const budgetRoutes = new Hono();
 
 // GET /api/budget - List all budgets
 budgetRoutes.get("/", (c) => {
-	const db = getDB();
-	const budgets = db.prepare("SELECT * FROM budgets ORDER BY created_at DESC").all();
+	const q = getQueries();
+	const budgets = q.getAllBudgets.all();
 	return c.json({ data: budgets });
 });
 
@@ -34,15 +34,17 @@ budgetRoutes.post("/", async (c) => {
 		return c.json({ error: "amount_usd must be a positive number" }, 400);
 	}
 
-	const db = getDB();
-	const result = db
-		.prepare(
-			`INSERT INTO budgets (profile, period, amount_usd, alert_threshold_pct, notify_method, notify_url)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-		)
-		.run(profile, period, amount_usd, alert_threshold_pct, notify_method, notify_url || null);
+	const q = getQueries();
+	const result = q.insertBudget.run(
+		profile,
+		period,
+		amount_usd,
+		alert_threshold_pct,
+		notify_method,
+		notify_url || null,
+	);
 
-	const budget = db.prepare("SELECT * FROM budgets WHERE id = ?").get(result.lastInsertRowid);
+	const budget = q.getBudgetById.get(result.lastInsertRowid);
 	return c.json({ data: budget }, 201);
 });
 
@@ -52,21 +54,13 @@ budgetRoutes.put("/:id", async (c) => {
 	const body = await c.req.json();
 	const { amount_usd, alert_threshold_pct, notify_method, notify_url } = body;
 
-	const db = getDB();
-	const existing = db.prepare("SELECT * FROM budgets WHERE id = ?").get(id);
+	const q = getQueries();
+	const existing = q.getBudgetById.get(id);
 	if (!existing) {
 		return c.json({ error: "Budget not found" }, 404);
 	}
 
-	db.prepare(
-		`UPDATE budgets SET
-       amount_usd = COALESCE(?, amount_usd),
-       alert_threshold_pct = COALESCE(?, alert_threshold_pct),
-       notify_method = COALESCE(?, notify_method),
-       notify_url = COALESCE(?, notify_url),
-       updated_at = datetime('now')
-     WHERE id = ?`,
-	).run(
+	q.updateBudget.run(
 		amount_usd ?? null,
 		alert_threshold_pct ?? null,
 		notify_method ?? null,
@@ -74,15 +68,15 @@ budgetRoutes.put("/:id", async (c) => {
 		id,
 	);
 
-	const budget = db.prepare("SELECT * FROM budgets WHERE id = ?").get(id);
+	const budget = q.getBudgetById.get(id);
 	return c.json({ data: budget });
 });
 
 // DELETE /api/budget/:id - Delete budget
 budgetRoutes.delete("/:id", (c) => {
 	const id = c.req.param("id");
-	const db = getDB();
-	const result = db.prepare("DELETE FROM budgets WHERE id = ?").run(id);
+	const q = getQueries();
+	const result = q.deleteBudget.run(id);
 
 	if (result.changes === 0) {
 		return c.json({ error: "Budget not found" }, 404);
@@ -92,15 +86,7 @@ budgetRoutes.delete("/:id", (c) => {
 
 // GET /api/budget/alerts - List recent alerts
 budgetRoutes.get("/alerts", (c) => {
-	const db = getDB();
-	const alerts = db
-		.prepare(
-			`SELECT ba.*, b.profile, b.period, b.amount_usd
-     FROM budget_alerts ba
-     JOIN budgets b ON ba.budget_id = b.id
-     ORDER BY ba.triggered_at DESC
-     LIMIT 50`,
-		)
-		.all();
+	const q = getQueries();
+	const alerts = q.getAlertsWithBudgets.all();
 	return c.json({ data: alerts });
 });

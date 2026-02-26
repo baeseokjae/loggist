@@ -1,3 +1,4 @@
+import { NuqsAdapter } from "nuqs/adapters/react-router/v7";
 import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./components/layout/app-shell";
@@ -6,23 +7,27 @@ import { LoginPage } from "./pages/login";
 import { OverviewPage } from "./pages/overview";
 import { SearchPage } from "./pages/search";
 import { SessionsPage } from "./pages/sessions";
+import { SignalsPage } from "./pages/signals";
 import { TimelinePage } from "./pages/timeline";
 import { useAuthStore } from "./stores/auth";
 
 export function App() {
 	return (
 		<BrowserRouter>
-			<Routes>
-				<Route path="/login" element={<LoginPage />} />
-				<Route element={<ProtectedRoute />}>
-					<Route path="/" element={<Navigate to="/budget" replace />} />
-					<Route path="/budget" element={<BudgetPage />} />
-					<Route path="/overview" element={<OverviewPage />} />
-					<Route path="/sessions" element={<SessionsPage />} />
-					<Route path="/timeline" element={<TimelinePage />} />
-					<Route path="/search" element={<SearchPage />} />
-				</Route>
-			</Routes>
+			<NuqsAdapter>
+				<Routes>
+					<Route path="/login" element={<LoginPage />} />
+					<Route element={<ProtectedRoute />}>
+						<Route path="/" element={<Navigate to="/budget" replace />} />
+						<Route path="/budget" element={<BudgetPage />} />
+						<Route path="/overview" element={<OverviewPage />} />
+						<Route path="/sessions" element={<SessionsPage />} />
+						<Route path="/timeline" element={<TimelinePage />} />
+						<Route path="/search" element={<SearchPage />} />
+						<Route path="/signals" element={<SignalsPage />} />
+					</Route>
+				</Routes>
+			</NuqsAdapter>
 		</BrowserRouter>
 	);
 }

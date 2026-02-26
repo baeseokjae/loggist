@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { initDB } from "./db/index";
 import { authMiddleware } from "./middleware/auth";
+import { errorHandler } from "./middleware/error-handler";
 import { createRateLimiter } from "./middleware/rate-limit";
 import { securityHeaders } from "./middleware/security-headers";
 import { startLokiTail } from "./realtime/loki-tail";
@@ -16,7 +17,9 @@ import { eventsRoutes } from "./routes/events";
 import { logsRoutes } from "./routes/logs";
 import { metricsRoutes } from "./routes/metrics";
 import { sessionsRoutes } from "./routes/sessions";
+import { signalsRoutes } from "./routes/signals";
 import { startBudgetChecker } from "./workers/budget-checker";
+import { startSignalEvaluator } from "./workers/signal-evaluator";
 
 const app = new Hono();
 
@@ -25,6 +28,7 @@ await migratePasswordFromEnv();
 
 app.use("*", securityHeaders);
 app.use("*", logger());
+app.onError(errorHandler);
 
 app.route("/api/auth", authRoutes);
 
@@ -39,6 +43,7 @@ app.route("/api/sessions", sessionsRoutes);
 app.route("/api/metrics", metricsRoutes);
 app.route("/api/logs", logsRoutes);
 app.route("/api/events", eventsRoutes);
+app.route("/api/signals", signalsRoutes);
 
 // 프로덕션: 빌드된 React SPA 서빙
 if (process.env.NODE_ENV === "production") {
@@ -59,6 +64,7 @@ if (process.env.NODE_ENV === "production") {
 const port = Number(process.env.PORT) || 3001;
 
 startBudgetChecker();
+startSignalEvaluator();
 startLokiTail();
 initFanout();
 

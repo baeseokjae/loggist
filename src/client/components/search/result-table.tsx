@@ -1,4 +1,4 @@
-import { formatDuration, formatTokens, formatUSD } from "../../lib/format";
+import { formatDuration, formatNanoTimestamp, formatTokens, formatUSD } from "../../lib/format";
 import { cn } from "../../lib/utils";
 
 export interface LogEntry {
@@ -36,15 +36,6 @@ const EVENT_LABELS: Record<string, string> = {
 	tool_decision: "도구 결정",
 	user_prompt: "사용자 입력",
 };
-
-function formatTimestamp(ts: string): string {
-	try {
-		const ms = Number(BigInt(ts) / 1_000_000n);
-		return new Date(ms).toLocaleString();
-	} catch {
-		return new Date(ts).toLocaleString();
-	}
-}
 
 function DetailsCell({ entry }: { entry: LogEntry }) {
 	if (entry.event_name === "api_error") {
@@ -108,7 +99,7 @@ export function ResultTable({ entries, isLoading }: ResultTableProps) {
 								)}
 							>
 								<td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted-foreground">
-									{formatTimestamp(entry.timestamp)}
+									{formatNanoTimestamp(entry.timestamp)}
 								</td>
 								<td className="px-3 py-2">
 									<span className={cn("rounded px-1.5 py-0.5 text-xs font-medium", badgeClass)}>

@@ -1,15 +1,8 @@
 import { type FormEvent, useState } from "react";
+import type { Budget } from "../../../shared/types/domain";
 import { useCreateBudget, useDeleteBudget } from "../../hooks/use-budget";
 import { formatUSD } from "../../lib/format";
 import { cn } from "../../lib/utils";
-
-interface Budget {
-	id: number;
-	profile: string;
-	period: string;
-	amount_usd: number;
-	alert_threshold_pct: number;
-}
 
 interface BudgetSettingsProps {
 	budgets: Budget[];

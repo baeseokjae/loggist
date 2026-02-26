@@ -1,16 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import type { PrometheusResult } from "../../shared/types/prometheus";
 import { api } from "../lib/api-client";
-
-interface PrometheusResult {
-	data: {
-		resultType: string;
-		result: Array<{
-			metric: Record<string, string>;
-			value?: [number, string];
-			values?: [number, string][];
-		}>;
-	};
-}
 
 export function useMetricQuery(preset: string, profile = "all", range = "24h") {
 	return useQuery({

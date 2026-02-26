@@ -1,0 +1,113 @@
+import { useMemo } from "react";
+import uPlot from "uplot";
+import { useMetricRangeQuery } from "../../hooks/use-metrics-query";
+import { buildAlignedData, getChartColors } from "../../lib/chart-utils";
+import { ChartContainer } from "../charts/chart-container";
+import { UPlotWrapper } from "../charts/uplot-wrapper";
+
+interface BudgetHistoryProps {
+	dailyBudget?: number;
+}
+
+function buildOptions(dailyBudget: number | undefined): Partial<uPlot.Options> {
+	const colors = getChartColors();
+
+	const series: uPlot.Series[] = [
+		{},
+		{
+			label: "일일 비용 (USD)",
+			stroke: colors.chart1,
+			fill: (u: uPlot) => {
+				const ctx = u.ctx;
+				const grad = ctx.createLinearGradient(0, u.bbox.top, 0, u.bbox.top + u.bbox.height);
+				grad.addColorStop(0, `${colors.chart1}99`);
+				grad.addColorStop(1, `${colors.chart1}11`);
+				return grad;
+			},
+			width: 0,
+			paths: uPlot.paths.bars?.({ size: [0.6, 100] }),
+			value: (_u, v) => (v != null ? `$${v.toFixed(4)}` : "-"),
+			points: { show: false },
+		},
+	];
+
+	const hooks: uPlot.Hooks.Arrays = {};
+
+	if (dailyBudget != null) {
+		hooks.draw = [
+			(u: uPlot) => {
+				const ctx = u.ctx;
+				const x0 = u.bbox.left;
+				const x1 = u.bbox.left + u.bbox.width;
+				const yPos = u.valToPos(dailyBudget, "y", true);
+
+				ctx.save();
+				ctx.beginPath();
+				ctx.setLineDash([6, 4]);
+				ctx.strokeStyle = colors.chart4;
+				ctx.lineWidth = 1.5;
+				ctx.moveTo(x0, yPos);
+				ctx.lineTo(x1, yPos);
+				ctx.stroke();
+
+				ctx.setLineDash([]);
+				ctx.fillStyle = colors.chart4;
+				ctx.font = "11px sans-serif";
+				ctx.fillText(`예산 $${dailyBudget.toFixed(2)}`, x0 + 4, yPos - 4);
+				ctx.restore();
+			},
+		];
+	}
+
+	return {
+		height: 240,
+		series,
+		axes: [
+			{
+				stroke: colors.foreground,
+				grid: { stroke: colors.border, width: 1 },
+				ticks: { stroke: colors.border, width: 1 },
+			},
+			{
+				label: "USD",
+				stroke: colors.foreground,
+				grid: { stroke: colors.border, width: 1 },
+				ticks: { stroke: colors.border, width: 1 },
+				values: (_u, vals) => vals.map((v) => (v != null ? `$${v.toFixed(2)}` : "")),
+			},
+		],
+		scales: {
+			x: { time: true },
+		},
+		legend: { show: true },
+		cursor: { show: true },
+		padding: [16, 8, 8, 8],
+		hooks,
+	};
+}
+
+export function BudgetHistory({ dailyBudget }: BudgetHistoryProps) {
+	const now = useMemo(() => Math.floor(Date.now() / 1000), []);
+	const start = String(now - 14 * 86400);
+	const end = String(now);
+
+	const { data: result, isLoading, isError } = useMetricRangeQuery("cost", start, end, "86400");
+
+	const chartData = useMemo(() => buildAlignedData(result ?? []), [result]);
+	const options = useMemo(() => buildOptions(dailyBudget), [dailyBudget]);
+
+	return (
+		<ChartContainer
+			isLoading={isLoading}
+			isError={isError}
+			isEmpty={!result?.length}
+			errorMessage="비용 이력 데이터를 불러오지 못했습니다."
+			emptyMessage="표시할 비용 이력이 없습니다."
+		>
+			<div className="rounded-xl border bg-card p-4">
+				<h3 className="mb-3 text-sm font-medium text-muted-foreground">최근 14일 일별 비용</h3>
+				<UPlotWrapper data={chartData} options={options} className="w-full" />
+			</div>
+		</ChartContainer>
+	);
+}

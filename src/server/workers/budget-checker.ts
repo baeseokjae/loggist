@@ -1,17 +1,10 @@
 import { getDB } from "../db/index";
 import { queryPrometheus } from "../services/prometheus";
+import { notify } from "../services/notifier";
+import { parseScalarValue } from "../utils/prometheus-parser";
+import type { Budget } from "../../shared/types/domain";
 
 const BUDGET_CHECK_INTERVAL = 60_000;
-
-interface Budget {
-	id: number;
-	profile: string;
-	period: string;
-	amount_usd: number;
-	alert_threshold_pct: number;
-	notify_method: string;
-	notify_url: string | null;
-}
 
 export function startBudgetChecker() {
 	async function check() {
@@ -44,6 +37,22 @@ export function startBudgetChecker() {
 								console.log(
 									`[Budget Alert] ${budget.period} budget: $${currentSpend.toFixed(2)} / $${budget.amount_usd} (${pct.toFixed(1)}%) - threshold ${threshold}%`,
 								);
+
+								const severity = threshold >= 100 ? "critical" : "warning";
+								const title = `Budget ${threshold >= 100 ? "Exceeded" : "Alert"}: ${budget.period} (${budget.profile})`;
+								const message =
+									`Spent $${currentSpend.toFixed(2)} of $${budget.amount_usd.toFixed(2)} ` +
+									`(${pct.toFixed(1)}%) — threshold ${threshold}%`;
+
+								notify({
+									method: budget.notify_method as "dashboard" | "slack" | "webhook",
+									url: budget.notify_url,
+									title,
+									message,
+									severity,
+								}).catch((err) =>
+									console.error("[Budget Checker] notify() failed:", err),
+								);
 							}
 						}
 					}
@@ -71,8 +80,7 @@ async function getCurrentSpend(profile: string, period: string): Promise<number>
 
 	try {
 		const result = await queryPrometheus(query);
-		const typedResult = result as { data?: { result?: Array<{ value?: [number, string] }> } };
-		return Number.parseFloat(typedResult?.data?.result?.[0]?.value?.[1] ?? "0");
+		return parseScalarValue(result);
 	} catch {
 		return 0;
 	}

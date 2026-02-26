@@ -1,5 +1,6 @@
 import { BudgetAlerts } from "../components/budget/budget-alerts";
 import { BudgetGauge } from "../components/budget/budget-gauge";
+import { BudgetHistory } from "../components/budget/budget-history";
 import { BudgetSettings } from "../components/budget/budget-settings";
 import { useBudgets, useCurrentSpend } from "../hooks/use-budget";
 
@@ -43,6 +44,8 @@ export function BudgetPage() {
 					</div>
 				)}
 			</div>
+
+			<BudgetHistory dailyBudget={dailyBudget?.amount_usd} />
 
 			<div className="grid gap-6 lg:grid-cols-2">
 				<BudgetSettings budgets={budgets ?? []} />

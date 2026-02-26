@@ -1,39 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { FilterPanel, type ProfileValue } from "../components/search/filter-panel";
+import { parseAsArrayOf, parseAsString, useQueryState } from "nuqs";
+import { FilterPanel } from "../components/search/filter-panel";
 import { type LogEntry, ResultTable } from "../components/search/result-table";
 import { SearchBar } from "../components/search/search-bar";
 import { api } from "../lib/api-client";
-
-interface LokiStream {
-	stream: Record<string, string>;
-	values: [string, string][];
-}
-
-interface LokiQueryResult {
-	data?: {
-		result?: LokiStream[];
-	};
-}
-
-function parseLokiResult(raw: unknown): LogEntry[] {
-	const result = raw as LokiQueryResult;
-	const streams = result?.data?.result ?? [];
-	return streams.flatMap((stream) =>
-		stream.values.map(([tsNano, line]) => {
-			try {
-				return { timestamp: tsNano, ...(JSON.parse(line) as Record<string, unknown>) } as LogEntry;
-			} catch {
-				return { timestamp: tsNano, raw: line } satisfies LogEntry;
-			}
-		}),
-	);
-}
+import { parseLokiResult } from "../lib/loki-parser";
+import { useProfileFilter } from "../stores/profile-filter";
 
 export function SearchPage() {
-	const [keyword, setKeyword] = useState("");
-	const [profile, setProfile] = useState<ProfileValue>("all");
-	const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
+	const [keyword, setKeyword] = useQueryState("q", parseAsString.withDefault(""));
+	const { profile, setProfile } = useProfileFilter();
+	const [selectedEventTypes, setSelectedEventTypes] = useQueryState(
+		"events",
+		parseAsArrayOf(parseAsString).withDefault([]),
+	);
 
 	const queryParams = new URLSearchParams();
 	if (keyword) queryParams.set("keyword", keyword);
@@ -47,7 +27,7 @@ export function SearchPage() {
 		queryKey: ["logs-search", keyword, profile, selectedEventTypes],
 		queryFn: () => api.get<unknown>(`/logs/query?${queryParams.toString()}`),
 		enabled: isActive,
-		select: parseLokiResult,
+		select: (raw) => parseLokiResult(raw) as LogEntry[],
 	});
 
 	const entries: LogEntry[] = data ?? [];

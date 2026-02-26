@@ -9,7 +9,7 @@ const navItems = [
 	{ to: "/sessions", label: "세션", icon: Activity },
 	{ to: "/timeline", label: "타임라인", icon: Radio },
 	{ to: "/search", label: "검색", icon: Search },
-	{ to: "/signals", label: "시그널", icon: Bell, disabled: true },
+	{ to: "/signals", label: "시그널", icon: Bell },
 ];
 
 export function Sidebar() {
@@ -25,17 +25,15 @@ export function Sidebar() {
 				{navItems.map((item) => (
 					<NavLink
 						key={item.to}
-						to={item.disabled ? "#" : item.to}
+						to={item.to}
 						className={({ isActive }) =>
 							cn(
 								"flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-								isActive && !item.disabled
+								isActive
 									? "bg-sidebar-accent text-sidebar-accent-foreground"
 									: "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-								item.disabled && "cursor-not-allowed opacity-40",
 							)
 						}
-						onClick={(e) => item.disabled && e.preventDefault()}
 					>
 						<item.icon className="h-4 w-4" />
 						{item.label}

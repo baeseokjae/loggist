@@ -1,0 +1,34 @@
+groups:
+  - name: claude_code_aggregations
+    interval: 1m
+    rules:
+      # Hourly cost aggregation per profile
+      - record: claude_code:cost_per_hour
+        expr: sum by (profile) (increase(claude_code_cost_usage_USD_total[1h]))
+
+      # Hourly token aggregation per profile
+      - record: claude_code:tokens_per_hour
+        expr: sum by (profile) (increase(claude_code_token_usage_tokens_total[1h]))
+
+      # 5-minute cost rate by model
+      - record: claude_code:cost_rate_by_model:5m
+        expr: sum by (model) (rate(claude_code_cost_usage_USD_total[5m]))
+
+      # 5-minute token rate by type (input/output/cache)
+      - record: claude_code:token_rate_by_type:5m
+        expr: sum by (token_type) (rate(claude_code_token_usage_tokens_total[5m]))
+
+      # Cache hit ratio: cache_read / (cache_read + cache_creation)
+      - record: claude_code:cache_hit_ratio
+        expr: >
+          sum(rate(claude_code_cache_read_input_tokens_total[5m]))
+          /
+          (
+            sum(rate(claude_code_cache_read_input_tokens_total[5m]))
+            +
+            sum(rate(claude_code_cache_creation_input_tokens_total[5m]))
+          )
+
+      # 5-minute error rate by HTTP status code
+      - record: claude_code:error_rate_by_status:5m
+        expr: sum by (http_status_code) (rate(claude_code_api_requests_total{http_status_code=~"4..|5.."}[5m]))

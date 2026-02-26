@@ -1,29 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Budget, BudgetAlert } from "../../shared/types/domain";
 import { api } from "../lib/api-client";
-
-interface Budget {
-	id: number;
-	profile: string;
-	period: string;
-	amount_usd: number;
-	alert_threshold_pct: number;
-	notify_method: string;
-	notify_url: string | null;
-	created_at: string;
-	updated_at: string;
-}
-
-interface BudgetAlert {
-	id: number;
-	budget_id: number;
-	triggered_at: string;
-	current_amount_usd: number;
-	threshold_pct: number;
-	notified: number;
-	profile: string;
-	period: string;
-	amount_usd: number;
-}
 
 interface BudgetListResponse {
 	data: Budget[];

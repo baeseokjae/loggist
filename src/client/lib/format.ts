@@ -23,3 +23,18 @@ export function formatDuration(seconds: number): string {
 	if (h > 0) return `${h}h ${m}m`;
 	return `${m}m`;
 }
+
+export function formatNanoTimestamp(tsNano: string): string {
+	try {
+		const ms = Math.floor(Number(BigInt(tsNano) / 1_000_000n));
+		return new Date(ms).toLocaleString("ko-KR", {
+			month: "2-digit",
+			day: "2-digit",
+			hour: "2-digit",
+			minute: "2-digit",
+			second: "2-digit",
+		});
+	} catch {
+		return tsNano;
+	}
+}
