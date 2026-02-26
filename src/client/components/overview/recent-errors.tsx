@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api-client";
 import { formatNanoTimestamp } from "../../lib/format";
 import { parseLokiResult } from "../../lib/loki-parser";
+import { useProfileFilter } from "../../stores/profile-filter";
 
 interface ErrorEntry {
 	timestamp: string;
@@ -16,9 +17,9 @@ function parseLokiErrors(raw: unknown): ErrorEntry[] {
 	return entries
 		.map((entry) => ({
 			timestamp: entry.timestamp,
-			status_code: entry.status_code as number | undefined,
+			status_code: (entry.status_code ?? entry.http_status_code) as number | undefined,
 			model: entry.model as string | undefined,
-			error_message: entry.error_message as string | undefined,
+			error_message: (entry.error_message ?? entry.message) as string | undefined,
 			event_name: entry.event_name as string | undefined,
 		}))
 		.sort((a, b) => Number(BigInt(b.timestamp) - BigInt(a.timestamp)));
@@ -48,9 +49,16 @@ function ErrorTypeBadge({ code }: { code?: number }) {
 }
 
 export function RecentErrors() {
+	const { profile } = useProfileFilter();
+
+	const params = new URLSearchParams();
+	params.set("eventTypes", "api_error");
+	params.set("limit", "10");
+	if (profile && profile !== "all") params.set("profile", profile);
+
 	const { data: errors, isLoading } = useQuery({
-		queryKey: ["recent-errors"],
-		queryFn: () => api.get<unknown>("/logs/query?eventTypes=api_error&limit=10"),
+		queryKey: ["recent-errors", profile],
+		queryFn: () => api.get<unknown>(`/logs/query?${params.toString()}`),
 		select: parseLokiErrors,
 		refetchInterval: 30_000,
 	});

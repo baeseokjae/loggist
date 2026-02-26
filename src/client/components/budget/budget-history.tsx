@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import uPlot from "uplot";
 import { useMetricRangeQuery } from "../../hooks/use-metrics-query";
-import { buildAlignedData, getChartColors } from "../../lib/chart-utils";
+import { buildAlignedData, getChartColors, withAlpha } from "../../lib/chart-utils";
 import { ChartContainer } from "../charts/chart-container";
 import { UPlotWrapper } from "../charts/uplot-wrapper";
 
@@ -19,11 +19,11 @@ function buildOptions(dailyBudget: number | undefined): Partial<uPlot.Options> {
 			stroke: colors.chart1,
 			fill: (u: uPlot) => {
 				const { top, height } = u.bbox;
-				if (!Number.isFinite(top) || !Number.isFinite(height)) return `${colors.chart1}33`;
+				if (!Number.isFinite(top) || !Number.isFinite(height)) return withAlpha(colors.chart1, 0.2);
 				const ctx = u.ctx;
 				const grad = ctx.createLinearGradient(0, top, 0, top + height);
-				grad.addColorStop(0, `${colors.chart1}99`);
-				grad.addColorStop(1, `${colors.chart1}11`);
+				grad.addColorStop(0, withAlpha(colors.chart1, 0.6));
+				grad.addColorStop(1, withAlpha(colors.chart1, 0.07));
 				return grad;
 			},
 			width: 0,
@@ -93,7 +93,7 @@ export function BudgetHistory({ dailyBudget }: BudgetHistoryProps) {
 	const start = String(now - 14 * 86400);
 	const end = String(now);
 
-	const { data: result, isLoading, isError } = useMetricRangeQuery("cost", start, end, "86400");
+	const { data: result, isLoading, isError } = useMetricRangeQuery("cost", start, end, "86400", "all", "increase");
 
 	const chartData = useMemo(() => buildAlignedData(result ?? []), [result]);
 	const options = useMemo(() => buildOptions(dailyBudget), [dailyBudget]);

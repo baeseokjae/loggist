@@ -224,7 +224,8 @@ export function startSignalEvaluator() {
 							.prepare(
 								`SELECT 1 FROM signal_events
                  WHERE rule_id = ? AND profile = ?
-                 AND fired_at > datetime('now', '-1 hour')`,
+                 AND fired_at > datetime('now', '-1 hour')
+                 AND acknowledged = 0`,
 							)
 							.get(rule.id, profile);
 

@@ -1,5 +1,19 @@
 import type uPlot from "uplot";
 
+/** Add alpha to any CSS color format (oklch, hsl, rgb, hex) */
+export function withAlpha(color: string, alpha: number): string {
+	if (color.endsWith(")")) {
+		return color.slice(0, -1) + ` / ${alpha})`;
+	}
+	if (color.startsWith("#")) {
+		const hex = Math.round(alpha * 255)
+			.toString(16)
+			.padStart(2, "0");
+		return color.length <= 7 ? `${color}${hex}` : color;
+	}
+	return color;
+}
+
 // Shared across all chart components
 export function getChartColors() {
 	const style = getComputedStyle(document.documentElement);

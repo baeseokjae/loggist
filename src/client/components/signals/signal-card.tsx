@@ -178,6 +178,7 @@ interface SignalCardProps {
 
 export function SignalCard({ signal, rule, onAcknowledged }: SignalCardProps) {
 	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState(false);
 
 	const severity = rule?.severity ?? "info";
 	const styles = SEVERITY_STYLES[severity] ?? SEVERITY_STYLES.info;
@@ -185,11 +186,13 @@ export function SignalCard({ signal, rule, onAcknowledged }: SignalCardProps) {
 
 	async function handleAcknowledge() {
 		setLoading(true);
+		setError(false);
 		try {
 			await api.post(`/signals/${signal.id}/acknowledge`, {});
 			onAcknowledged(signal.id);
 		} catch (err) {
 			console.error("Failed to acknowledge signal", err);
+			setError(true);
 		} finally {
 			setLoading(false);
 		}
@@ -240,6 +243,9 @@ export function SignalCard({ signal, rule, onAcknowledged }: SignalCardProps) {
 						>
 							{loading ? "처리 중..." : "확인"}
 						</button>
+					)}
+					{error && (
+						<p className="mt-1 text-xs text-destructive">처리 실패</p>
 					)}
 				</div>
 			</div>

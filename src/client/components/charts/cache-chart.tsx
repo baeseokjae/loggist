@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type uPlot from "uplot";
 import { useMetricRangeQuery } from "../../hooks/use-metrics-query";
-import { getChartColors } from "../../lib/chart-utils";
+import { getChartColors, withAlpha } from "../../lib/chart-utils";
 import { ChartContainer } from "./chart-container";
 import { UPlotWrapper } from "./uplot-wrapper";
 
@@ -100,7 +100,7 @@ export function CacheChart({ start, end, step = "300", className }: CacheChartPr
 					label: "캐시 히트율",
 					stroke: colors.chart3,
 					width: 2,
-					fill: `${colors.chart3}20`,
+					fill: withAlpha(colors.chart3, 0.12),
 					value: (_u, v) => (v != null ? `${v.toFixed(1)}%` : "-"),
 				},
 			],

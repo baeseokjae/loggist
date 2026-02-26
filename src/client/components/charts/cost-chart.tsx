@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type uPlot from "uplot";
 import { useMetricRangeQuery } from "../../hooks/use-metrics-query";
-import { buildAlignedData, getChartColors } from "../../lib/chart-utils";
+import { buildAlignedData, getChartColors, withAlpha } from "../../lib/chart-utils";
 import { ChartContainer } from "./chart-container";
 import { UPlotWrapper } from "./uplot-wrapper";
 
@@ -27,7 +27,7 @@ export function CostChart({ start, end, step = "300", className }: CostChartProp
 					label: "비용 (USD)",
 					stroke: colors.chart1,
 					width: 2,
-					fill: `${colors.chart1}20`,
+					fill: withAlpha(colors.chart1, 0.12),
 					value: (_u, v) => (v != null ? `$${v.toFixed(4)}` : "-"),
 				},
 			],

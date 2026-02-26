@@ -57,18 +57,32 @@ metricsRoutes.get("/query_range", async (c) => {
 			? computeStep(startSec, endSec, maxPoints)
 			: clientStep;
 
+	const mode = c.req.query("mode") || "rate"; // "rate" | "increase"
+
 	try {
 		const metric = getMetricForPreset(preset || "cost");
-		const query = buildPromQLQuery({
-			metric,
-			profile,
-			range: "5m",
-			aggregation: "sum",
-			by: preset === "cost_by_model" ? ["model"] : undefined,
-		});
-		// For range query, we use rate instead of increase
-		const rateQuery = query.replace("increase(", "rate(");
-		const result = await queryPrometheusRange(rateQuery, start, end, step);
+		let finalQuery: string;
+
+		if (mode === "increase") {
+			// For absolute totals (e.g., daily cost), use increase() with step-sized window
+			const labels: string[] = [];
+			if (profile && profile !== "all") labels.push(`profile="${profile}"`);
+			const labelStr = labels.length > 0 ? `{${labels.join(",")}}` : "";
+			const byClause = preset === "cost_by_model" ? " by (model)" : "";
+			finalQuery = `sum${byClause}(increase(${metric}${labelStr}[${step}s]))`;
+		} else {
+			// For time-series rate charts, use rate() with fixed 5m window
+			const query = buildPromQLQuery({
+				metric,
+				profile,
+				range: "5m",
+				aggregation: "sum",
+				by: preset === "cost_by_model" ? ["model"] : undefined,
+			});
+			finalQuery = query.replace("increase(", "rate(");
+		}
+
+		const result = await queryPrometheusRange(finalQuery, start, end, step);
 
 		// Apply LTTB downsampling to each series in the result.
 		const typedResult = result as PrometheusResult | undefined;

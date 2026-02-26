@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type uPlot from "uplot";
 import { useMetricRangeQuery } from "../../hooks/use-metrics-query";
-import { buildAlignedData, getChartColors } from "../../lib/chart-utils";
+import { buildAlignedData, getChartColors, withAlpha } from "../../lib/chart-utils";
 import { ChartContainer } from "./chart-container";
 import { UPlotWrapper } from "./uplot-wrapper";
 
@@ -34,7 +34,7 @@ export function TokenChart({ start, end, step = "300", className }: TokenChartPr
 					label: "토큰 수",
 					stroke: colors.chart2,
 					width: 2,
-					fill: `${colors.chart2}20`,
+					fill: withAlpha(colors.chart2, 0.12),
 					value: (_u, v) => formatTokenValue(v),
 				},
 			],

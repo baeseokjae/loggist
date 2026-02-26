@@ -23,12 +23,13 @@ export function useMetricRangeQuery(
 	end: string,
 	step = "60",
 	profile = "all",
+	mode: "rate" | "increase" = "rate",
 ) {
 	return useQuery({
-		queryKey: ["metric-range", preset, profile, start, end, step],
+		queryKey: ["metric-range", preset, profile, start, end, step, mode],
 		queryFn: () =>
 			api.get<PrometheusResult>(
-				`/metrics/query_range?preset=${preset}&profile=${profile}&start=${start}&end=${end}&step=${step}`,
+				`/metrics/query_range?preset=${preset}&profile=${profile}&start=${start}&end=${end}&step=${step}&mode=${mode}`,
 			),
 		select: (res) => res?.data?.result || [],
 		enabled: !!start && !!end,
