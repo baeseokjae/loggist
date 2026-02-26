@@ -11,9 +11,9 @@ export function parseLokiResult(raw: unknown): ParsedLogEntry[] {
 	return streams.flatMap((stream) =>
 		stream.values.map(([tsNano, line]) => {
 			try {
-				return { timestamp: tsNano, ...(JSON.parse(line) as Record<string, unknown>) };
+				return { timestamp: tsNano, ...stream.stream, ...(JSON.parse(line) as Record<string, unknown>) };
 			} catch {
-				return { timestamp: tsNano, raw: line };
+				return { timestamp: tsNano, ...stream.stream, raw: line };
 			}
 		}),
 	);

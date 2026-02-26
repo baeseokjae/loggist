@@ -12,6 +12,7 @@ export const ALLOWED_METRICS = [
 	"claude_code_token_usage_tokens_total",
 	"claude_code_cache_read_input_tokens_total",
 	"claude_code_cache_creation_input_tokens_total",
+	"claude_code:cache_hit_ratio",
 	"claude_code_active_time_seconds_total",
 	"claude_code_session_count_total",
 	"claude_code_commit_count_total",

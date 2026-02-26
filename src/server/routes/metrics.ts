@@ -12,18 +12,29 @@ function computeStep(startSec: number, endSec: number, maxPoints = 500): string 
 	return String(step);
 }
 
+const GAUGE_PRESETS = new Set(["cache_hit_ratio"]);
+
 // Preset-based metric queries (no raw PromQL from client)
 metricsRoutes.get("/query", async (c) => {
-	const preset = c.req.query("preset");
+	const preset = c.req.query("preset") || "cost";
 	const profile = c.req.query("profile") || "all";
 	const range = c.req.query("range") || "24h";
 
 	try {
-		const query = buildPromQLQuery({
-			metric: getMetricForPreset(preset || "cost"),
-			profile,
-			range,
-		});
+		const metric = getMetricForPreset(preset);
+
+		if (preset === "cache_hit_ratio") {
+			// Use avg_over_time on the recording rule so the KPI reflects the full selected range
+			// Filter profile=~".+" to exclude label-less series that contain NaN
+			const labels: string[] = ['profile=~".+"'];
+			if (profile && profile !== "all") labels.push(`profile="${profile}"`);
+			const labelStr = `{${labels.join(",")}}`;
+			const query = `avg(avg_over_time(${metric}${labelStr}[${range}]))`;
+			const result = await queryPrometheus(query);
+			return c.json(result);
+		}
+
+		const query = buildPromQLQuery({ metric, profile, range });
 		const result = await queryPrometheus(query);
 		return c.json(result);
 	} catch (error) {
@@ -63,7 +74,12 @@ metricsRoutes.get("/query_range", async (c) => {
 		const metric = getMetricForPreset(preset || "cost");
 		let finalQuery: string;
 
-		if (mode === "increase") {
+		if (GAUGE_PRESETS.has(preset || "cost")) {
+			const labels: string[] = [];
+			if (profile && profile !== "all") labels.push(`profile="${profile}"`);
+			const labelStr = labels.length > 0 ? `{${labels.join(",")}}` : "";
+			finalQuery = `avg(${metric}${labelStr})`;
+		} else if (mode === "increase") {
 			// For absolute totals (e.g., daily cost), use increase() with step-sized window
 			const labels: string[] = [];
 			if (profile && profile !== "all") labels.push(`profile="${profile}"`);
@@ -107,6 +123,7 @@ function getMetricForPreset(preset: string): string {
 		tokens: "claude_code_token_usage_tokens_total",
 		cache_read: "claude_code_cache_read_input_tokens_total",
 		cache_creation: "claude_code_cache_creation_input_tokens_total",
+		cache_hit_ratio: "claude_code:cache_hit_ratio",
 		active_time: "claude_code_active_time_seconds_total",
 		sessions: "claude_code_session_count_total",
 	};

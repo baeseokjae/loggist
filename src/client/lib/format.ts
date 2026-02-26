@@ -8,6 +8,7 @@ export function formatUSD(amount: number): string {
 }
 
 export function formatPercent(value: number): string {
+	if (!Number.isFinite(value)) return "0.0%";
 	return `${value.toFixed(1)}%`;
 }
 

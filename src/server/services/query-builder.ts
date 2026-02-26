@@ -61,6 +61,7 @@ export function buildLogQLQuery(params: {
 	profile?: string;
 	eventTypes?: string[];
 	keyword?: string;
+	sessionId?: string;
 }): string {
 	const streamLabels: string[] = ['service_name="claude-code"'];
 	if (params.profile && params.profile !== "all" && isAllowedProfile(params.profile)) {
@@ -80,6 +81,13 @@ export function buildLogQLQuery(params: {
 					? `| event_name = "${validTypes[0]}"`
 					: `| event_name =~ "${validTypes.join("|")}"`;
 			query += ` ${eventFilter}`;
+		}
+	}
+
+	if (params.sessionId) {
+		const sanitized = params.sessionId.replace(/[^a-zA-Z0-9_\-]/g, "").slice(0, 200);
+		if (sanitized.length > 0) {
+			query += ` | session_id = \`${sanitized}\``;
 		}
 	}
 

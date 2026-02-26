@@ -15,15 +15,13 @@ export function OverviewPage() {
 
 	const { data: cost, isLoading: costLoading } = useMetricQuery("cost", profile, range);
 	const { data: tokens, isLoading: tokensLoading } = useMetricQuery("tokens", profile, range);
-	const { data: cacheRead, isLoading: cacheLoading } = useMetricQuery(
-		"cache_read",
+	const { data: cacheHitRatio, isLoading: cacheLoading } = useMetricQuery(
+		"cache_hit_ratio",
 		profile,
 		range,
 	);
-	const { data: cacheCreation } = useMetricQuery("cache_creation", profile, range);
 
-	const cacheRate =
-		cacheRead && cacheCreation ? (cacheRead / (cacheRead + cacheCreation)) * 100 : 0;
+	const cacheRate = (cacheHitRatio ?? 0) * 100;
 
 	return (
 		<div className="space-y-6">
@@ -36,7 +34,7 @@ export function OverviewPage() {
 					value={formatTokens(tokens ?? 0)}
 					isLoading={tokensLoading}
 				/>
-				<KpiCard title="캐시 히트율" value={formatPercent(cacheRate)} isLoading={cacheLoading} />
+				<KpiCard title={`${label} 캐시 히트율`} value={formatPercent(cacheRate)} isLoading={cacheLoading} />
 			</div>
 
 			<div className="rounded-xl border bg-card p-6">

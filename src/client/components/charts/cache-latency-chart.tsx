@@ -15,13 +15,12 @@ interface CacheLatencyChartProps {
 type MetricSeries = Array<{ metric: Record<string, string>; values?: [number, string][] }>;
 
 function buildCacheLatencyAlignedData(
-	readResult: MetricSeries,
-	creationResult: MetricSeries,
+	cacheRatioResult: MetricSeries,
 	latencyResult: MetricSeries,
 ): uPlot.AlignedData {
 	// Collect all unique timestamps across all series
 	const tsSet = new Set<number>();
-	for (const series of [...readResult, ...creationResult, ...latencyResult]) {
+	for (const series of [...cacheRatioResult, ...latencyResult]) {
 		for (const [ts] of series.values ?? []) {
 			tsSet.add(ts);
 		}
@@ -35,21 +34,18 @@ function buildCacheLatencyAlignedData(
 	const tsIndex = new Map(timestamps.map((ts, i) => [ts, i]));
 	const len = timestamps.length;
 
-	// Build per-timestamp maps for read and creation values
-	const readMap = new Map<number, number>();
-	for (const series of readResult) {
+	// Cache hit ratio (recording rule returns 0-1, convert to percentage)
+	const cacheArr: (number | null)[] = new Array(len).fill(null);
+	for (const series of cacheRatioResult) {
 		for (const [ts, valStr] of series.values ?? []) {
-			readMap.set(ts, (readMap.get(ts) ?? 0) + Number.parseFloat(valStr));
+			const idx = tsIndex.get(ts);
+			if (idx === undefined) continue;
+			const val = Number.parseFloat(valStr);
+			cacheArr[idx] = Number.isFinite(val) ? val * 100 : null;
 		}
 	}
 
-	const creationMap = new Map<number, number>();
-	for (const series of creationResult) {
-		for (const [ts, valStr] of series.values ?? []) {
-			creationMap.set(ts, (creationMap.get(ts) ?? 0) + Number.parseFloat(valStr));
-		}
-	}
-
+	// Latency series
 	const latencyMap = new Map<number, number>();
 	for (const series of latencyResult) {
 		for (const [ts, valStr] of series.values ?? []) {
@@ -57,18 +53,6 @@ function buildCacheLatencyAlignedData(
 		}
 	}
 
-	// Compute cache hit ratio percentage at each timestamp
-	const cacheArr: (number | null)[] = new Array(len).fill(null);
-	for (const ts of timestamps) {
-		const idx = tsIndex.get(ts);
-		if (idx === undefined) continue;
-		const read = readMap.get(ts) ?? 0;
-		const creation = creationMap.get(ts) ?? 0;
-		const total = read + creation;
-		cacheArr[idx] = total > 0 ? (read / total) * 100 : null;
-	}
-
-	// Latency series
 	const latencyArr: (number | null)[] = new Array(len).fill(null);
 	for (const ts of timestamps) {
 		const idx = tsIndex.get(ts);
@@ -82,16 +66,10 @@ function buildCacheLatencyAlignedData(
 
 export function CacheLatencyChart({ start, end, step = "300", className }: CacheLatencyChartProps) {
 	const {
-		data: readResult,
-		isLoading: readLoading,
-		isError: readError,
-	} = useMetricRangeQuery("cache_read", start, end, step);
-
-	const {
-		data: creationResult,
-		isLoading: creationLoading,
-		isError: creationError,
-	} = useMetricRangeQuery("cache_creation", start, end, step);
+		data: cacheRatioResult,
+		isLoading: cacheLoading,
+		isError: cacheError,
+	} = useMetricRangeQuery("cache_hit_ratio", start, end, step);
 
 	const {
 		data: latencyResult,
@@ -99,12 +77,12 @@ export function CacheLatencyChart({ start, end, step = "300", className }: Cache
 		isError: latencyError,
 	} = useMetricRangeQuery("active_time", start, end, step);
 
-	const isLoading = readLoading || creationLoading || latencyLoading;
-	const isError = readError || creationError || latencyError;
+	const isLoading = cacheLoading || latencyLoading;
+	const isError = cacheError || latencyError;
 
 	const chartData = useMemo(
-		() => buildCacheLatencyAlignedData(readResult ?? [], creationResult ?? [], latencyResult ?? []),
-		[readResult, creationResult, latencyResult],
+		() => buildCacheLatencyAlignedData(cacheRatioResult ?? [], latencyResult ?? []),
+		[cacheRatioResult, latencyResult],
 	);
 
 	const hasData =
