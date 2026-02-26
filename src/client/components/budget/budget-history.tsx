@@ -18,8 +18,10 @@ function buildOptions(dailyBudget: number | undefined): Partial<uPlot.Options> {
 			label: "일일 비용 (USD)",
 			stroke: colors.chart1,
 			fill: (u: uPlot) => {
+				const { top, height } = u.bbox;
+				if (!Number.isFinite(top) || !Number.isFinite(height)) return `${colors.chart1}33`;
 				const ctx = u.ctx;
-				const grad = ctx.createLinearGradient(0, u.bbox.top, 0, u.bbox.top + u.bbox.height);
+				const grad = ctx.createLinearGradient(0, top, 0, top + height);
 				grad.addColorStop(0, `${colors.chart1}99`);
 				grad.addColorStop(1, `${colors.chart1}11`);
 				return grad;
