@@ -10,6 +10,7 @@ import { errorHandler } from "./middleware/error-handler";
 import { createRateLimiter } from "./middleware/rate-limit";
 import { securityHeaders } from "./middleware/security-headers";
 import { startLokiTail } from "./realtime/loki-tail";
+import { initSessionTitleCache } from "./realtime/session-title-cache";
 import { initFanout } from "./realtime/sse-fanout";
 import { authRoutes, migratePasswordFromEnv } from "./routes/auth";
 import { budgetRoutes } from "./routes/budget";
@@ -66,6 +67,7 @@ const port = Number(process.env.PORT) || 3001;
 startBudgetChecker();
 startSignalEvaluator();
 startLokiTail();
+initSessionTitleCache();
 initFanout();
 
 serve({ fetch: app.fetch, port }, (info) => {

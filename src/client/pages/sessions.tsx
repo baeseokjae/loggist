@@ -5,6 +5,8 @@ import { Header } from "../components/layout/header";
 import { SessionDetail } from "../components/sessions/session-detail";
 import { SessionList } from "../components/sessions/session-list";
 import { api } from "../lib/api-client";
+import { useProfileFilter } from "../stores/profile-filter";
+import { useTimeRange } from "../stores/time-range";
 
 interface SessionDetailData {
 	sessionId: string;
@@ -14,16 +16,31 @@ interface SessionDetailData {
 
 export function SessionsPage() {
 	const [selectedSession, setSelectedSession] = useQueryState("id", parseAsString);
+	const { start, end } = useTimeRange();
+	const { profile } = useProfileFilter();
+
+	const listParams = new URLSearchParams();
+	listParams.set("start", start);
+	listParams.set("end", end);
+	if (profile !== "all") listParams.set("profile", profile);
 
 	const { data: sessions, isLoading } = useQuery({
-		queryKey: ["sessions"],
-		queryFn: () => api.get<{ data: SessionSummary[] }>("/sessions"),
+		queryKey: ["sessions", start, end, profile],
+		queryFn: () => api.get<{ data: SessionSummary[] }>(`/sessions?${listParams.toString()}`),
 		select: (res) => res.data,
 	});
 
+	const detailParams = new URLSearchParams();
+	detailParams.set("start", start);
+	detailParams.set("end", end);
+	if (profile !== "all") detailParams.set("profile", profile);
+
 	const { data: detail } = useQuery({
-		queryKey: ["session-detail", selectedSession],
-		queryFn: () => api.get<{ data: SessionDetailData }>(`/sessions/${selectedSession}`),
+		queryKey: ["session-detail", selectedSession, start, end, profile],
+		queryFn: () =>
+			api.get<{ data: SessionDetailData }>(
+				`/sessions/${selectedSession}?${detailParams.toString()}`,
+			),
 		select: (res) => res.data,
 		enabled: !!selectedSession,
 	});

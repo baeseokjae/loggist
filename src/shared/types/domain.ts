@@ -50,6 +50,8 @@ export interface SessionSummary {
 	toolCalls: number;
 	toolFailures: number;
 	models: string[];
+	firstPrompt: string | null;
+	durationMs: number;
 }
 
 export interface SessionEvent {

@@ -39,3 +39,10 @@ CREATE TABLE IF NOT EXISTS signal_events (
 
 CREATE INDEX IF NOT EXISTS idx_signal_events_fired_at ON signal_events(fired_at);
 CREATE INDEX IF NOT EXISTS idx_signal_events_rule_id ON signal_events(rule_id);
+
+CREATE TABLE IF NOT EXISTS session_titles (
+  session_id TEXT PRIMARY KEY,
+  first_prompt TEXT NOT NULL,
+  profile TEXT NOT NULL DEFAULT 'all',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

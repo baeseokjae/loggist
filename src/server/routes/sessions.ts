@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { getDB } from "../db/index";
 import { queryLokiRange } from "../services/loki";
 import type { SessionSummary } from "../../shared/types/domain";
 import type { LokiQueryResult } from "../../shared/types/loki";
@@ -20,6 +21,52 @@ sessionsRoutes.get("/", async (c) => {
 		const result = await queryLokiRange(query, start, end, 1000);
 		const sessions = groupBySessions(result);
 		return c.json({ data: sessions.slice(0, limit) });
+	} catch (error) {
+		return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+	}
+});
+
+// POST /api/sessions/backfill-titles - Backfill session titles from Loki
+sessionsRoutes.post("/backfill-titles", async (c) => {
+	const start = c.req.query("start") || String(Math.floor(Date.now() / 1000) - 86400 * 30);
+	const end = c.req.query("end") || String(Math.floor(Date.now() / 1000));
+
+	const query = `{service_name="claude-code"} | event_name = "user_prompt"`;
+
+	try {
+		const result = await queryLokiRange(query, start, end, 5000);
+		const entries = parseLogEntries(result);
+
+		const db = getDB();
+		const upsert = db.prepare(
+			"INSERT OR IGNORE INTO session_titles (session_id, first_prompt, profile) VALUES (?, ?, ?)",
+		);
+
+		let count = 0;
+		const seen = new Set<string>();
+		for (const entry of entries) {
+			if (
+				entry.session_id &&
+				entry.session_id !== "default" &&
+				!seen.has(entry.session_id)
+			) {
+				seen.add(entry.session_id);
+				let prompt = entry.raw;
+				try {
+					const parsed = JSON.parse(entry.raw) as Record<string, unknown>;
+					const body = parsed.body as Record<string, unknown> | undefined;
+					prompt = String(parsed.prompt || body?.prompt || entry.raw);
+				} catch {
+					// use raw line as fallback
+				}
+				if (prompt && prompt.length > 0) {
+					upsert.run(entry.session_id, prompt.slice(0, 200), "all");
+					count++;
+				}
+			}
+		}
+
+		return c.json({ data: { backfilled: count } });
 	} catch (error) {
 		return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
 	}
@@ -130,11 +177,7 @@ function parseLogEntries(result: unknown): LogEntry[] {
 	return entries.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 }
 
-interface LocalSessionSummary extends SessionSummary {
-	durationMs: number;
-}
-
-function computeSessionSummary(events: LogEntry[]): LocalSessionSummary {
+function computeSessionSummary(events: LogEntry[]): SessionSummary {
 	const models = new Set<string>();
 	let totalCost = 0;
 	let totalInputTokens = 0;
@@ -171,6 +214,7 @@ function computeSessionSummary(events: LogEntry[]): LocalSessionSummary {
 		toolCalls,
 		toolFailures,
 		models: [...models],
+		firstPrompt: null,
 		durationMs:
 			events.length > 0
 				? Number(events[events.length - 1].timestamp) - Number(events[0].timestamp)
@@ -178,7 +222,7 @@ function computeSessionSummary(events: LogEntry[]): LocalSessionSummary {
 	};
 }
 
-function groupBySessions(result: unknown): LocalSessionSummary[] {
+function groupBySessions(result: unknown): SessionSummary[] {
 	const entries = parseLogEntries(result);
 	const sessionMap = new Map<string, LogEntry[]>();
 
@@ -188,9 +232,33 @@ function groupBySessions(result: unknown): LocalSessionSummary[] {
 		sessionMap.get(sid)?.push(entry);
 	}
 
-	const summaries: LocalSessionSummary[] = [];
+	const summaries: SessionSummary[] = [];
 	for (const [, events] of sessionMap) {
 		summaries.push(computeSessionSummary(events));
+	}
+
+	// Batch SQLite lookup for session titles
+	const sessionIds = summaries
+		.map((s) => s.sessionId)
+		.filter((id) => id !== "unknown" && id !== "default");
+
+	if (sessionIds.length > 0) {
+		try {
+			const db = getDB();
+			const placeholders = sessionIds.map(() => "?").join(", ");
+			const rows = db
+				.prepare(
+					`SELECT session_id, first_prompt FROM session_titles WHERE session_id IN (${placeholders})`,
+				)
+				.all(...sessionIds) as { session_id: string; first_prompt: string }[];
+
+			const titleMap = new Map(rows.map((r) => [r.session_id, r.first_prompt]));
+			for (const s of summaries) {
+				s.firstPrompt = titleMap.get(s.sessionId) ?? null;
+			}
+		} catch {
+			// Non-fatal: titles are best-effort
+		}
 	}
 
 	return summaries.sort((a, b) => b.startTime.localeCompare(a.startTime));
