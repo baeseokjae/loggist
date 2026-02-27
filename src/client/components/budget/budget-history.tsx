@@ -89,9 +89,17 @@ function buildOptions(dailyBudget: number | undefined): Partial<uPlot.Options> {
 }
 
 export function BudgetHistory({ dailyBudget }: BudgetHistoryProps) {
-	const now = useMemo(() => Math.floor(Date.now() / 1000), []);
-	const start = String(now - 14 * 86400);
-	const end = String(now);
+	const { start, end } = useMemo(() => {
+		const KST_OFFSET_SEC = 9 * 3600;
+		const nowSec = Math.floor(Date.now() / 1000);
+		// Align start to KST midnight 14 days ago
+		const nowKST = nowSec + KST_OFFSET_SEC;
+		const todayMidnightKST = Math.floor(nowKST / 86400) * 86400 - KST_OFFSET_SEC;
+		return {
+			start: String(todayMidnightKST - 14 * 86400),
+			end: String(nowSec),
+		};
+	}, []);
 
 	const { data: result, isLoading, isError } = useMetricRangeQuery("cost", start, end, "86400", "all", "increase");
 

@@ -29,7 +29,6 @@ export const RULE_LABELS: Record<string, string> = {
 	api_error_burst: "API 오류 급증",
 	data_collection_stopped: "데이터 수집 중단",
 	cache_efficiency_drop: "캐시 효율 저하",
-	budget_exceeded: "예산 초과",
 };
 
 // Event type display configuration

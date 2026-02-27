@@ -1,4 +1,4 @@
-import { Activity, Bell, DollarSign, LayoutDashboard, LogOut, Radio, Search } from "lucide-react";
+import { Activity, Bell, DollarSign, LayoutDashboard, LogOut, Radio, Search, TrendingUp } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "../../lib/utils";
 import { useAuthStore } from "../../stores/auth";
@@ -6,6 +6,7 @@ import { useAuthStore } from "../../stores/auth";
 const navItems = [
 	{ to: "/budget", label: "비용 예산", icon: DollarSign },
 	{ to: "/overview", label: "개요", icon: LayoutDashboard },
+	{ to: "/productivity", label: "생산성", icon: TrendingUp },
 	{ to: "/sessions", label: "세션", icon: Activity },
 	{ to: "/timeline", label: "타임라인", icon: Radio },
 	{ to: "/search", label: "검색", icon: Search },

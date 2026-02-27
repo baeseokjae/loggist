@@ -10,6 +10,7 @@ export type { Signal, SignalRule };
 
 function formatFiredAt(iso: string): string {
 	return new Date(iso).toLocaleString("ko-KR", {
+		timeZone: "Asia/Seoul",
 		year: "numeric",
 		month: "2-digit",
 		day: "2-digit",
@@ -93,7 +94,7 @@ function SignalDataDetails({ ruleId, raw }: { ruleId: string; raw: string }) {
 					<span>
 						마지막 이벤트:{" "}
 						<span className="font-medium text-foreground">
-							{new Date(parsed.last_event_at).toLocaleString("ko-KR")}
+							{new Date(parsed.last_event_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}
 						</span>
 					</span>
 				)}
@@ -108,13 +109,14 @@ function SignalDataDetails({ ruleId, raw }: { ruleId: string; raw: string }) {
 	}
 
 	if (ruleId === "cache_efficiency_drop") {
+		const ratio = parsed.cache_hit_ratio ?? parsed.ratio;
 		return (
 			<div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-				{parsed.cache_hit_ratio != null && (
+				{ratio != null && (
 					<span>
 						캐시 히트율:{" "}
 						<span className="font-medium text-foreground">
-							{(parsed.cache_hit_ratio * 100).toFixed(1)}%
+							{((ratio as number) * 100).toFixed(1)}%
 						</span>
 					</span>
 				)}
@@ -122,34 +124,24 @@ function SignalDataDetails({ ruleId, raw }: { ruleId: string; raw: string }) {
 					<span>
 						임계값:{" "}
 						<span className="font-medium text-foreground">
-							{(parsed.threshold * 100).toFixed(1)}%
+							{((parsed.threshold as number) * 100).toFixed(1)}%
 						</span>
 					</span>
 				)}
-			</div>
-		);
-	}
-
-	if (ruleId === "budget_exceeded") {
-		const periodLabel =
-			{ daily: "일일", weekly: "주간", monthly: "월간" }[parsed.period ?? ""] || parsed.period;
-		return (
-			<div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-				{parsed.spend_usd != null && (
+				{parsed.cacheRead != null && (
 					<span>
-						지출:{" "}
-						<span className="font-medium text-foreground">{formatUSD(parsed.spend_usd)}</span>
+						캐시 읽기 토큰:{" "}
+						<span className="font-medium text-foreground">
+							{Number(parsed.cacheRead).toLocaleString()}
+						</span>
 					</span>
 				)}
-				{parsed.budget_usd != null && (
+				{parsed.totalTokens != null && (
 					<span>
-						예산:{" "}
-						<span className="font-medium text-foreground">{formatUSD(parsed.budget_usd)}</span>
-					</span>
-				)}
-				{periodLabel && (
-					<span>
-						기간: <span className="font-medium text-foreground">{periodLabel}</span>
+						총 토큰:{" "}
+						<span className="font-medium text-foreground">
+							{Number(parsed.totalTokens).toLocaleString()}
+						</span>
 					</span>
 				)}
 			</div>

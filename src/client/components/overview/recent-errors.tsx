@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
+import { useErrorSummary } from "../../hooks/use-error-summary";
 import { api } from "../../lib/api-client";
 import { formatNanoTimestamp, formatTokens } from "../../lib/format";
 import { parseLokiResult, type ParsedLogEntry } from "../../lib/loki-parser";
+import { cn } from "../../lib/utils";
 import { useProfileFilter } from "../../stores/profile-filter";
 import { useTimeRange } from "../../stores/time-range";
 
@@ -232,8 +234,11 @@ function ErrorDetailPanel({ error }: { error: ErrorEntry }) {
 
 export function RecentErrors() {
 	const { profile } = useProfileFilter();
-	const { start, end, label } = useTimeRange();
+	const { range, start, end, label } = useTimeRange();
 	const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+	const [filterCode, setFilterCode] = useState<string | null>(null);
+
+	const { data: errorSummary } = useErrorSummary(profile, range);
 
 	const params = new URLSearchParams();
 	params.set("eventTypes", "api_error");
@@ -249,14 +254,59 @@ export function RecentErrors() {
 		refetchInterval: 30_000,
 	});
 
+	const filteredErrors = filterCode
+		? (errors ?? []).filter((err) => String(err.status_code) === filterCode)
+		: (errors ?? []);
+
 	return (
 		<div className="rounded-xl border bg-card p-6">
 			<h2 className="mb-4 text-base font-semibold">최근 에러 ({label})</h2>
+
+			{errorSummary && errorSummary.data.errors.length > 0 && (
+				<div className="flex flex-wrap gap-2 mb-4">
+					<button
+						type="button"
+						onClick={() => setFilterCode(null)}
+						className={cn(
+							"rounded-full px-3 py-1 text-xs font-medium transition-colors",
+							filterCode === null
+								? "bg-foreground text-background"
+								: "bg-muted text-muted-foreground hover:bg-muted/80",
+						)}
+					>
+						전체
+					</button>
+					{errorSummary.data.errors.map(({ statusCode, count }: { statusCode: string; count: number }) => (
+						<button
+							type="button"
+							key={statusCode}
+							onClick={() => setFilterCode(filterCode === statusCode ? null : statusCode)}
+							className={cn(
+								"rounded-full px-3 py-1 text-xs font-medium transition-colors",
+								filterCode === statusCode
+									? statusCode === "429"
+										? "bg-yellow-500 text-white"
+										: statusCode.startsWith("5")
+											? "bg-red-500 text-white"
+											: "bg-gray-500 text-white"
+									: statusCode === "429"
+										? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+										: statusCode.startsWith("5")
+											? "bg-red-100 text-red-800 hover:bg-red-200"
+											: "bg-gray-100 text-gray-800 hover:bg-gray-200",
+							)}
+						>
+							{statusCode}: {count}건
+						</button>
+					))}
+				</div>
+			)}
+
 			{isLoading ? (
 				<div className="flex h-24 items-center justify-center">
 					<div className="h-6 w-6 animate-spin rounded-full border-4 border-muted border-t-primary" />
 				</div>
-			) : !errors?.length ? (
+			) : !filteredErrors.length ? (
 				<p className="py-6 text-center text-sm text-muted-foreground">에러 없음</p>
 			) : (
 				<div className="overflow-x-auto">
@@ -269,7 +319,7 @@ export function RecentErrors() {
 							</tr>
 						</thead>
 						<tbody>
-							{errors.map((err, i) => (
+							{filteredErrors.map((err, i) => (
 								<Fragment key={`${err.timestamp}-${i}`}>
 									<tr
 										className="border-b border-border/50 last:border-0 cursor-pointer hover:bg-muted/30 transition-colors"

@@ -5,6 +5,8 @@ import { notify } from "../services/notifier";
 import { parseScalarValue, parseResultCount } from "../utils/prometheus-parser";
 
 const SIGNAL_CHECK_INTERVAL = 60_000;
+const QUERY_FAILURE_THRESHOLD = 3;
+const CLEANUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
 
 interface SignalResult {
 	fired: boolean;
@@ -16,6 +18,42 @@ interface EvaluatorRule {
 	name: string;
 	description: string;
 	evaluate: (profile: string) => Promise<SignalResult>;
+}
+
+// Track consecutive query failures per rule
+const queryFailureCounts = new Map<string, number>();
+let lastCleanup = Date.now();
+
+function trackQueryFailure(ruleId: string, error: unknown): SignalResult {
+	const key = ruleId;
+	const count = (queryFailureCounts.get(key) ?? 0) + 1;
+	queryFailureCounts.set(key, count);
+	console.error(`[Signal Evaluator] ${ruleId} query failure (${count}/${QUERY_FAILURE_THRESHOLD}):`, error);
+	return { fired: false, error: String(error), consecutiveFailures: count };
+}
+
+function clearQueryFailure(ruleId: string) {
+	if (queryFailureCounts.has(ruleId)) {
+		queryFailureCounts.delete(ruleId);
+	}
+}
+
+// Rule 0: Query failure - fires when any rule's queries fail consecutively
+async function evaluateQueryFailure(_profile: string): Promise<SignalResult> {
+	const failingRules: string[] = [];
+	queryFailureCounts.forEach((count, ruleId) => {
+		if (count >= QUERY_FAILURE_THRESHOLD) {
+			failingRules.push(ruleId);
+		}
+	});
+	if (failingRules.length === 0) {
+		return { fired: false };
+	}
+	return {
+		fired: true,
+		failingRules,
+		message: `Rules with ${QUERY_FAILURE_THRESHOLD}+ consecutive query failures: ${failingRules.join(", ")}`,
+	};
 }
 
 // Rule 1: Cost spike - current 1h cost > $2 AND > 3x historical max from past 7d
@@ -38,10 +76,10 @@ async function evaluateCostSpike(profile: string): Promise<SignalResult> {
 		const historicalMax = parseScalarValue(historicalResult);
 
 		const fired = historicalMax > 0 && currentCost > historicalMax * 3;
+		clearQueryFailure("cost_spike");
 		return { fired, currentCost, historicalMax, ratio: historicalMax > 0 ? currentCost / historicalMax : null };
 	} catch (error) {
-		console.error("[Signal Evaluator] cost_spike error:", error);
-		return { fired: false, error: String(error) };
+		return trackQueryFailure("cost_spike", error);
 	}
 }
 
@@ -63,10 +101,10 @@ async function evaluateApiErrorBurst(profile: string): Promise<SignalResult> {
 		const rateLimitErrors = parseScalarValue(rateLimitResult);
 
 		const fired = serverErrors >= 5 || rateLimitErrors >= 20;
+		clearQueryFailure("api_error_burst");
 		return { fired, serverErrors, rateLimitErrors };
 	} catch (error) {
-		console.error("[Signal Evaluator] api_error_burst error:", error);
-		return { fired: false, error: String(error) };
+		return trackQueryFailure("api_error_burst", error);
 	}
 }
 
@@ -76,10 +114,10 @@ async function evaluateDataCollectionStopped(_profile: string): Promise<SignalRe
 		const result = await queryPrometheus(`up{job="otel-collector"} == 0`);
 		const downInstances = parseResultCount(result);
 		const fired = downInstances > 0;
+		clearQueryFailure("data_collection_stopped");
 		return { fired, downInstances };
 	} catch (error) {
-		console.error("[Signal Evaluator] data_collection_stopped error:", error);
-		return { fired: false, error: String(error) };
+		return trackQueryFailure("data_collection_stopped", error);
 	}
 }
 
@@ -104,59 +142,27 @@ async function evaluateCacheEfficiencyDrop(profile: string): Promise<SignalResul
 
 		const ratio = cacheRead / totalTokens;
 		const fired = ratio < 0.3;
-		return { fired, cacheRead, totalTokens, ratio };
-	} catch (error) {
-		console.error("[Signal Evaluator] cache_efficiency_drop error:", error);
-		return { fired: false, error: String(error) };
-	}
-}
-
-// Rule 5: Budget exceeded - unacknowledged budget alerts
-async function evaluateBudgetExceeded(profile: string): Promise<SignalResult> {
-	try {
-		const db = getDB();
-		const alert = db
-			.prepare(
-				`SELECT ba.*, b.profile, b.period, b.amount_usd
-         FROM budget_alerts ba
-         JOIN budgets b ON ba.budget_id = b.id
-         WHERE ba.notified = 0
-           AND (b.profile = ? OR ? = 'all')
-         ORDER BY ba.triggered_at DESC
-         LIMIT 1`,
-			)
-			.get(profile, profile) as
-			| {
-					id: number;
-					budget_id: number;
-					current_amount_usd: number;
-					threshold_pct: number;
-					profile: string;
-					period: string;
-					amount_usd: number;
-			  }
-			| undefined;
-
-		if (!alert) {
-			return { fired: false };
-		}
-
+		clearQueryFailure("cache_efficiency_drop");
 		return {
-			fired: true,
-			alertId: alert.id,
-			budgetId: alert.budget_id,
-			currentAmountUsd: alert.current_amount_usd,
-			thresholdPct: alert.threshold_pct,
-			budgetAmountUsd: alert.amount_usd,
-			period: alert.period,
+			fired,
+			cacheRead,
+			totalTokens,
+			ratio,
+			cache_hit_ratio: ratio,
+			threshold: 0.3,
 		};
 	} catch (error) {
-		console.error("[Signal Evaluator] budget_exceeded error:", error);
-		return { fired: false, error: String(error) };
+		return trackQueryFailure("cache_efficiency_drop", error);
 	}
 }
 
 export const SIGNAL_RULES: EvaluatorRule[] = [
+	{
+		id: "query_failure",
+		name: "쿼리 실패",
+		description: `One or more signal rules have failed ${QUERY_FAILURE_THRESHOLD}+ consecutive query attempts`,
+		evaluate: evaluateQueryFailure,
+	},
 	{
 		id: "cost_spike",
 		name: "비용 급증",
@@ -180,12 +186,6 @@ export const SIGNAL_RULES: EvaluatorRule[] = [
 		name: "캐시 효율 저하",
 		description: "Cache hit ratio has been below 0.3 for the past 15 minutes",
 		evaluate: evaluateCacheEfficiencyDrop,
-	},
-	{
-		id: "budget_exceeded",
-		name: "예산 초과",
-		description: "An unacknowledged budget alert exists for the current profile",
-		evaluate: evaluateBudgetExceeded,
 	},
 ];
 
@@ -213,9 +213,24 @@ export function startSignalEvaluator() {
 			const db = getDB();
 			const profiles = await getActiveProfiles();
 
+			// Auto-cleanup: delete signal events older than 30 days (once per 24h)
+			if (Date.now() - lastCleanup > CLEANUP_INTERVAL) {
+				try {
+					const deleted = db.prepare(
+						`DELETE FROM signal_events WHERE fired_at < datetime('now', '-30 days')`,
+					).run();
+					if (deleted.changes > 0) {
+						console.log(`[Signal Evaluator] Cleaned up ${deleted.changes} old signal events`);
+					}
+					lastCleanup = Date.now();
+				} catch (err) {
+					console.error("[Signal Evaluator] Cleanup error:", err);
+				}
+			}
+
 			for (const rule of SIGNAL_RULES) {
-				// data_collection_stopped is profile-agnostic; evaluate once under "all"
-				const rulProfiles = rule.id === "data_collection_stopped" ? ["all"] : profiles;
+				// query_failure and data_collection_stopped are profile-agnostic; evaluate once under "all"
+				const rulProfiles = (rule.id === "data_collection_stopped" || rule.id === "query_failure") ? ["all"] : profiles;
 
 				for (const profile of rulProfiles) {
 					try {

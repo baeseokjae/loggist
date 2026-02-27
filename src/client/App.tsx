@@ -5,6 +5,7 @@ import { AppShell } from "./components/layout/app-shell";
 import { BudgetPage } from "./pages/budget";
 import { LoginPage } from "./pages/login";
 import { OverviewPage } from "./pages/overview";
+import { ProductivityPage } from "./pages/productivity";
 import { SearchPage } from "./pages/search";
 import { SessionsPage } from "./pages/sessions";
 import { SignalsPage } from "./pages/signals";
@@ -21,6 +22,7 @@ export function App() {
 						<Route path="/" element={<Navigate to="/budget" replace />} />
 						<Route path="/budget" element={<BudgetPage />} />
 						<Route path="/overview" element={<OverviewPage />} />
+						<Route path="/productivity" element={<ProductivityPage />} />
 						<Route path="/sessions" element={<SessionsPage />} />
 						<Route path="/timeline" element={<TimelinePage />} />
 						<Route path="/search" element={<SearchPage />} />

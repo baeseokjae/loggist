@@ -29,6 +29,7 @@ export function formatNanoTimestamp(tsNano: string): string {
 	try {
 		const ms = Math.floor(Number(BigInt(tsNano) / 1_000_000n));
 		return new Date(ms).toLocaleString("ko-KR", {
+			timeZone: "Asia/Seoul",
 			month: "2-digit",
 			day: "2-digit",
 			hour: "2-digit",

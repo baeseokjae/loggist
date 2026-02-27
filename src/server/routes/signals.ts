@@ -25,7 +25,7 @@ signalsRoutes.get("/", (c) => {
 
 	if (acknowledgedParam !== undefined) {
 		conditions.push("acknowledged = ?");
-		params.push(acknowledgedParam === "true" ? 1 : 0);
+		params.push(Number(acknowledgedParam));
 	}
 
 	const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -47,11 +47,11 @@ signalsRoutes.get("/", (c) => {
 
 // Severity mapping for each signal rule
 const RULE_SEVERITY: Record<string, "critical" | "warning" | "info"> = {
+	query_failure: "critical",
 	cost_spike: "critical",
 	api_error_burst: "critical",
 	data_collection_stopped: "critical",
 	cache_efficiency_drop: "warning",
-	budget_exceeded: "warning",
 };
 
 // GET /api/signals/rules - List available signal rule definitions

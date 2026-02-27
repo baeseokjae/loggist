@@ -68,11 +68,11 @@ describe("SIGNAL_RULES structure", () => {
 	it("has the expected rule ids in order", () => {
 		const ids = SIGNAL_RULES.map((r) => r.id);
 		expect(ids).toEqual([
+			"query_failure",
 			"cost_spike",
 			"api_error_burst",
 			"data_collection_stopped",
 			"cache_efficiency_drop",
-			"budget_exceeded",
 		]);
 	});
 });
@@ -308,62 +308,3 @@ describe("cache_efficiency_drop rule", () => {
 	});
 });
 
-describe("budget_exceeded rule", () => {
-	const rule = SIGNAL_RULES.find((r) => r.id === "budget_exceeded")!;
-
-	beforeEach(() => {
-		vi.clearAllMocks();
-	});
-
-	it("returns fired: true when an unacknowledged budget alert exists", async () => {
-		const fakeAlert = {
-			id: 1,
-			budget_id: 42,
-			current_amount_usd: 95.0,
-			threshold_pct: 80,
-			profile: "all",
-			period: "monthly",
-			amount_usd: 100.0,
-		};
-		mockGet.mockReturnValueOnce(fakeAlert);
-
-		const result = await rule.evaluate("all");
-
-		expect(result.fired).toBe(true);
-		expect(result.alertId).toBe(1);
-		expect(result.budgetId).toBe(42);
-		expect(result.currentAmountUsd).toBe(95.0);
-		expect(result.thresholdPct).toBe(80);
-		expect(result.budgetAmountUsd).toBe(100.0);
-		expect(result.period).toBe("monthly");
-	});
-
-	it("returns fired: false when no unacknowledged alerts exist", async () => {
-		mockGet.mockReturnValueOnce(undefined);
-
-		const result = await rule.evaluate("all");
-
-		expect(result.fired).toBe(false);
-	});
-
-	it("calls prepare with a query scoped to the given profile", async () => {
-		mockGet.mockReturnValueOnce(undefined);
-
-		await rule.evaluate("work");
-
-		expect(mockPrepare).toHaveBeenCalledWith(expect.stringContaining("budget_alerts"));
-		// get() should have been called with ("work", "work")
-		expect(mockGet).toHaveBeenCalledWith("work", "work");
-	});
-
-	it("returns fired: false and an error field when the DB throws", async () => {
-		mockPrepare.mockImplementationOnce(() => {
-			throw new Error("DB locked");
-		});
-
-		const result = await rule.evaluate("all");
-
-		expect(result.fired).toBe(false);
-		expect(typeof result.error).toBe("string");
-	});
-});

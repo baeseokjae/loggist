@@ -32,3 +32,14 @@ groups:
       # 5-minute error rate by HTTP status code
       - record: claude_code:error_rate_by_status:5m
         expr: sum by (http_status_code) (rate(claude_code_api_requests_total{http_status_code=~"4..|5.."}[5m]))
+
+      # Code edit accept ratio: accepts / (accepts + rejects)
+      - record: claude_code:code_edit_accept_ratio
+        expr: >
+          sum(rate(claude_code_code_edit_accept_total[5m]))
+          /
+          clamp_min(
+            sum(rate(claude_code_code_edit_accept_total[5m]))
+            + sum(rate(claude_code_code_edit_reject_total[5m])),
+            0.001
+          )

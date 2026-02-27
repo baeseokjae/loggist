@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { PROFILE_LABEL, PROFILE_VALUES, useProfileFilter } from "../../stores/profile-filter";
+import { PROFILE_LABEL, PROFILE_VALUES, useProfileFilter, useProfiles } from "../../stores/profile-filter";
 import { RANGE_LABEL, RANGE_VALUES, useTimeRange } from "../../stores/time-range";
 
 interface HeaderProps {
@@ -10,6 +10,12 @@ interface HeaderProps {
 export function Header({ title, children }: HeaderProps) {
 	const { range, setRange } = useTimeRange();
 	const { profile, setProfile } = useProfileFilter();
+	const { data: dynamicProfiles } = useProfiles();
+
+	// Use dynamic profiles if loaded, otherwise fall back to hardcoded list
+	const profileOptions: string[] = dynamicProfiles && dynamicProfiles.length > 0
+		? dynamicProfiles
+		: [...PROFILE_VALUES];
 
 	return (
 		<div className="flex items-center justify-between">
@@ -20,12 +26,12 @@ export function Header({ title, children }: HeaderProps) {
 					<span className="text-xs font-medium text-muted-foreground">프로필</span>
 					<select
 						value={profile}
-						onChange={(e) => setProfile(e.target.value as (typeof PROFILE_VALUES)[number])}
+						onChange={(e) => setProfile(e.target.value)}
 						className="h-7 rounded border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring"
 					>
-						{PROFILE_VALUES.map((p) => (
+						{profileOptions.map((p) => (
 							<option key={p} value={p}>
-								{PROFILE_LABEL[p]}
+								{PROFILE_LABEL[p] ?? p}
 							</option>
 						))}
 					</select>

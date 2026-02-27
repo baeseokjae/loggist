@@ -270,6 +270,12 @@ function EventTimeline({ events }: { events: SessionEvent[] }) {
 export function SessionDetail({ detail }: SessionDetailProps) {
 	const { summary, events } = detail;
 
+	const toolDecisionEvents = events.filter((e) => e.event_name === "tool_decision");
+	const editAccepts = toolDecisionEvents.filter((e) => e.success === true).length;
+	const editRejects = toolDecisionEvents.filter((e) => e.success === false).length;
+	const editTotal = editAccepts + editRejects;
+	const editAcceptRatio = editTotal > 0 ? (editAccepts / editTotal) * 100 : null;
+
 	return (
 		<div className="space-y-4">
 			<div className="grid grid-cols-4 gap-3">
@@ -277,6 +283,9 @@ export function SessionDetail({ detail }: SessionDetailProps) {
 				<StatCard label="API 호출" value={String(summary.apiCalls)} />
 				<StatCard label="도구 사용" value={String(summary.toolCalls)} />
 				<StatCard label="입력 토큰" value={formatTokens(summary.totalInputTokens)} />
+				{editAcceptRatio !== null && (
+					<StatCard label="편집 수락률" value={formatPercent(editAcceptRatio)} />
+				)}
 			</div>
 
 			<CostByModel events={events} totalCost={summary.totalCost} />

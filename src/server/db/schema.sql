@@ -46,3 +46,11 @@ CREATE TABLE IF NOT EXISTS session_titles (
   profile TEXT NOT NULL DEFAULT 'all',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS model_pricing (
+  model TEXT PRIMARY KEY,
+  input_price_per_mtok REAL NOT NULL,
+  cache_read_price_per_mtok REAL NOT NULL,
+  output_price_per_mtok REAL NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

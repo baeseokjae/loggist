@@ -84,3 +84,22 @@ export function useCurrentSpend(profile = "all", range = "24h") {
 		refetchInterval: 30_000,
 	});
 }
+
+interface BudgetForecastResponse {
+	data: {
+		currentMonthCost: number;
+		dailyAverage: number;
+		daysRemaining: number;
+		forecastedMonthTotal: number;
+	};
+}
+
+export function useBudgetForecast(profile = "all") {
+	return useQuery({
+		queryKey: ["budget-forecast", profile],
+		queryFn: () =>
+			api.get<BudgetForecastResponse>(`/budget/forecast?profile=${profile}`),
+		select: (res) => res?.data,
+		refetchInterval: 5 * 60_000,
+	});
+}

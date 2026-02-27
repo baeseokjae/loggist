@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { getQueries } from "../db/queries";
+import { queryPrometheus } from "../services/prometheus";
+import type { PrometheusResult } from "../../shared/types/prometheus";
 
 export const budgetRoutes = new Hono();
 
@@ -89,4 +91,52 @@ budgetRoutes.get("/alerts", (c) => {
 	const q = getQueries();
 	const alerts = q.getAlertsWithBudgets.all();
 	return c.json({ data: alerts });
+});
+
+// GET /api/budget/forecast - Forecast month-end cost
+budgetRoutes.get("/forecast", async (c) => {
+	const profile = c.req.query("profile") || "all";
+
+	try {
+		const now = new Date();
+		const daysElapsed = now.getDate();
+		const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+		const daysRemaining = daysInMonth - daysElapsed;
+
+		const profileFilter = profile === "all" ? 'profile=~".+"' : `profile="${profile}"`;
+
+		const [monthResult, weekResult] = await Promise.all([
+			queryPrometheus(
+				`sum(increase(claude_code_cost_usage_USD_total{${profileFilter}}[${daysElapsed}d]))`,
+			),
+			queryPrometheus(
+				`sum(increase(claude_code_cost_usage_USD_total{${profileFilter}}[7d])) / 7`,
+			),
+		]);
+
+		const monthTyped = monthResult as PrometheusResult | undefined;
+		const weekTyped = weekResult as PrometheusResult | undefined;
+
+		const currentMonthCost = Number.parseFloat(
+			monthTyped?.data?.result?.[0]?.value?.[1] ?? "0",
+		);
+		const dailyAverage = Number.parseFloat(
+			weekTyped?.data?.result?.[0]?.value?.[1] ?? "0",
+		);
+
+		const safeMonthCost = Number.isFinite(currentMonthCost) ? currentMonthCost : 0;
+		const safeDailyAverage = Number.isFinite(dailyAverage) ? dailyAverage : 0;
+		const forecastedMonthTotal = safeMonthCost + safeDailyAverage * daysRemaining;
+
+		return c.json({
+			data: {
+				currentMonthCost: safeMonthCost,
+				dailyAverage: safeDailyAverage,
+				daysRemaining,
+				forecastedMonthTotal,
+			},
+		});
+	} catch (error) {
+		return c.json({ error: String(error) }, 400);
+	}
 });

@@ -4,7 +4,7 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
-import { initDB } from "./db/index";
+import { getDB, initDB } from "./db/index";
 import { authMiddleware } from "./middleware/auth";
 import { errorHandler } from "./middleware/error-handler";
 import { createRateLimiter } from "./middleware/rate-limit";
@@ -33,8 +33,45 @@ app.onError(errorHandler);
 
 app.route("/api/auth", authRoutes);
 
-app.get("/api/health", (c) => {
-	return c.json({ status: "ok", uptime: process.uptime() });
+app.get("/api/health", async (c) => {
+	const prometheusUrl = process.env.PROMETHEUS_URL || "http://localhost:9090";
+	const lokiUrl = process.env.LOKI_URL || "http://localhost:3100";
+
+	const checkSqlite = async (): Promise<boolean> => {
+		try {
+			const db = getDB();
+			db.prepare("SELECT 1").get();
+			return true;
+		} catch {
+			return false;
+		}
+	};
+
+	const checkUrl = async (url: string): Promise<boolean> => {
+		try {
+			const controller = new AbortController();
+			const timeout = setTimeout(() => controller.abort(), 2000);
+			const res = await fetch(url, { signal: controller.signal });
+			clearTimeout(timeout);
+			return res.ok;
+		} catch {
+			return false;
+		}
+	};
+
+	const [sqliteResult, prometheusResult, lokiResult] = await Promise.allSettled([
+		checkSqlite(),
+		checkUrl(`${prometheusUrl}/-/healthy`),
+		checkUrl(`${lokiUrl}/ready`),
+	]);
+
+	const checks = {
+		sqlite: sqliteResult.status === "fulfilled" ? sqliteResult.value : false,
+		prometheus: prometheusResult.status === "fulfilled" ? prometheusResult.value : false,
+		loki: lokiResult.status === "fulfilled" ? lokiResult.value : false,
+	};
+
+	return c.json({ status: "ok", uptime: process.uptime(), checks });
 });
 
 app.use("/api/*", authMiddleware);

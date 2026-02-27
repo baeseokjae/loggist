@@ -28,6 +28,23 @@ export function initDB(dbPath?: string): Database.Database {
 	const schema = readFileSync(join(__dirname, "schema.sql"), "utf-8");
 	db.exec(schema);
 
+	// Seed default model pricing if table is empty
+	const pricingCount = (
+		db.prepare("SELECT COUNT(*) as count FROM model_pricing").get() as { count: number }
+	).count;
+	if (pricingCount === 0) {
+		const upsert = db.prepare(
+			`INSERT OR REPLACE INTO model_pricing (model, input_price_per_mtok, cache_read_price_per_mtok, output_price_per_mtok)
+       VALUES (?, ?, ?, ?)`,
+		);
+		const seedPricing = db.transaction(() => {
+			upsert.run("claude-opus-4", 15.0, 1.5, 75.0);
+			upsert.run("claude-sonnet-4", 3.0, 0.3, 15.0);
+			upsert.run("claude-haiku-3.5", 0.8, 0.08, 4.0);
+		});
+		seedPricing();
+	}
+
 	return db;
 }
 

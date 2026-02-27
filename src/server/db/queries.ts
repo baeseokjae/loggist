@@ -73,6 +73,13 @@ function createStatements(db: Database.Database) {
 		getNotifyWebhookUrl: db.prepare(
 			"SELECT value FROM settings WHERE key = 'notify_webhook_url'",
 		),
+
+		// Model pricing queries
+		getAllModelPricing: db.prepare("SELECT * FROM model_pricing"),
+		upsertModelPricing: db.prepare(
+			`INSERT OR REPLACE INTO model_pricing (model, input_price_per_mtok, cache_read_price_per_mtok, output_price_per_mtok)
+       VALUES (?, ?, ?, ?)`,
+		),
 	};
 }
 

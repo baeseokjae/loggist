@@ -9,7 +9,7 @@ interface EventCardProps {
 function formatTimestamp(tsNano: string): string {
 	// tsNano is a nanosecond epoch string; convert to ms
 	const ms = Number(BigInt(tsNano) / 1_000_000n);
-	return new Date(ms).toLocaleTimeString();
+	return new Date(ms).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
 const EVENT_STYLES: Record<string, { bg: string; badge: string; label: string }> = {
