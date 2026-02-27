@@ -119,14 +119,14 @@ export function CacheChart({ start, end, step = "300", className }: CacheChartPr
 				},
 			],
 			scales: {
-				x: { time: true },
+				x: { time: true, range: [Number(start), Number(end)] },
 				y: { range: [0, 100] },
 			},
 			legend: { show: true },
 			cursor: { show: true },
 			padding: [8, 8, 8, 8],
 		};
-	}, []);
+	}, [start, end]);
 
 	return (
 		<ChartContainer

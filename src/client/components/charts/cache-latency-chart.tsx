@@ -94,7 +94,7 @@ export function CacheLatencyChart({ start, end, step = "300", className }: Cache
 		return {
 			height: 240,
 			scales: {
-				x: { time: true },
+				x: { time: true, range: [Number(start), Number(end)] },
 				cache: { range: [0, 100] },
 				latency: { auto: true },
 			},
@@ -146,7 +146,7 @@ export function CacheLatencyChart({ start, end, step = "300", className }: Cache
 			cursor: { show: true },
 			padding: [8, 48, 8, 8],
 		};
-	}, []);
+	}, [start, end]);
 
 	return (
 		<ChartContainer
