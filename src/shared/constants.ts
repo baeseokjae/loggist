@@ -10,8 +10,6 @@ export type AllowedEventType = (typeof ALLOWED_EVENT_TYPES)[number];
 export const ALLOWED_METRICS = [
 	"claude_code_cost_usage_USD_total",
 	"claude_code_token_usage_tokens_total",
-	"claude_code_cache_read_input_tokens_total",
-	"claude_code_cache_creation_input_tokens_total",
 	"claude_code:cache_hit_ratio",
 	"claude_code:cost_per_hour",
 	"claude_code_active_time_seconds_total",

@@ -16,6 +16,12 @@ function computeStep(startSec: number, endSec: number, maxPoints = 500): string 
 
 const GAUGE_PRESETS = new Set(["cache_hit_ratio", "cost_per_hour", "edit_accept_ratio"]);
 
+// Presets that require an extra type label filter on claude_code_token_usage_tokens_total
+const PRESET_TYPE_FILTER: Record<string, string> = {
+	cache_read: "cacheRead",
+	cache_creation: "cacheCreation",
+};
+
 // Preset-based metric queries (no raw PromQL from client)
 metricsRoutes.get("/query", async (c) => {
 	const preset = c.req.query("preset") || "cost";
@@ -85,17 +91,22 @@ metricsRoutes.get("/query_range", async (c) => {
 			// For absolute totals (e.g., daily cost), use increase() with step-sized window
 			const labels: string[] = [];
 			if (profile && profile !== "all") labels.push(`profile="${profile}"`);
+			const typeFilter = PRESET_TYPE_FILTER[preset || ""];
+			if (typeFilter) labels.push(`type="${typeFilter}"`);
 			const labelStr = labels.length > 0 ? `{${labels.join(",")}}` : "";
 			const byClause = preset === "cost_by_model" ? " by (model)" : "";
 			finalQuery = `sum${byClause}(increase(${metric}${labelStr}[${step}s]))`;
 		} else {
 			// For time-series rate charts, use rate() with fixed 5m window
+			const typeFilter = PRESET_TYPE_FILTER[preset || ""];
+			const extraLabels = typeFilter ? { type: typeFilter } : undefined;
 			const query = buildPromQLQuery({
 				metric,
 				profile,
 				range: "5m",
 				aggregation: "sum",
 				by: preset === "cost_by_model" ? ["model"] : undefined,
+				extraLabels,
 			});
 			finalQuery = query.replace("increase(", "rate(");
 		}
@@ -131,7 +142,7 @@ metricsRoutes.get("/cache-savings", async (c) => {
 
 	try {
 		const profileFilter = profile === "all" ? 'profile=~".+"' : `profile="${profile}"`;
-		const query = `sum by (model) (increase(claude_code_cache_read_input_tokens_total{${profileFilter}}[${range}]))`;
+		const query = `sum by (model) (increase(claude_code_token_usage_tokens_total{type="cacheRead",${profileFilter}}[${range}]))`;
 		const prometheusResult = (await queryPrometheus(query)) as PrometheusResult;
 
 		const pricingRows = getQueries().getAllModelPricing.all() as Array<{
@@ -215,7 +226,7 @@ metricsRoutes.get("/model-comparison", async (c) => {
 				`sum by (model) (increase(claude_code_token_usage_tokens_total{${profileFilter}}[${range}]))`,
 			),
 			queryPrometheus(
-				`sum by (model) (increase(claude_code_cache_read_input_tokens_total{${profileFilter}}[${range}]))`,
+				`sum by (model) (increase(claude_code_token_usage_tokens_total{type="cacheRead",${profileFilter}}[${range}]))`,
 			),
 		]);
 
@@ -336,8 +347,8 @@ function getMetricForPreset(preset: string): string {
 		cost: "claude_code_cost_usage_USD_total",
 		cost_by_model: "claude_code_cost_usage_USD_total",
 		tokens: "claude_code_token_usage_tokens_total",
-		cache_read: "claude_code_cache_read_input_tokens_total",
-		cache_creation: "claude_code_cache_creation_input_tokens_total",
+		cache_read: "claude_code_token_usage_tokens_total",
+		cache_creation: "claude_code_token_usage_tokens_total",
 		cache_hit_ratio: "claude_code:cache_hit_ratio",
 		cost_per_hour: "claude_code:cost_per_hour",
 		edit_accept_ratio: "claude_code:code_edit_accept_ratio",

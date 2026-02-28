@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import uPlot from "uplot";
 import { tooltipPlugin } from "../../lib/chart-tooltip-plugin";
 import { useMetricRangeQuery } from "../../hooks/use-metrics-query";
-import { buildCumulativeModelData, getModelColor, withAlpha } from "../../lib/chart-utils";
+import { buildCumulativeModelData, buildPerStepModelData, getModelColor, withAlpha } from "../../lib/chart-utils";
 import { useProfileFilter } from "../../stores/profile-filter";
 import { ChartContainer } from "./chart-container";
 import { UPlotWrapper } from "./uplot-wrapper";
@@ -12,6 +12,7 @@ interface CostChartProps {
 	end: string;
 	step?: string;
 	className?: string;
+	variant?: "cumulative" | "per-step";
 }
 
 function fmtUSD(v: number | null): string {
@@ -21,7 +22,7 @@ function fmtUSD(v: number | null): string {
 	return `$${v.toFixed(4)}`;
 }
 
-export function CostChart({ start, end, step = "300", className }: CostChartProps) {
+export function CostChart({ start, end, step = "300", className, variant = "cumulative" }: CostChartProps) {
 	const { profile } = useProfileFilter();
 	const {
 		data: result,
@@ -29,18 +30,34 @@ export function CostChart({ start, end, step = "300", className }: CostChartProp
 		isError,
 	} = useMetricRangeQuery("cost_by_model", start, end, step, profile, "increase");
 
-	const { data: chartData, models } = useMemo(() => buildCumulativeModelData(result ?? []), [result]);
+	const { data: chartData, models } = useMemo(
+		() => (variant === "per-step" ? buildPerStepModelData(result ?? []) : buildCumulativeModelData(result ?? [])),
+		[result, variant],
+	);
 
 	const hasData = models.length > 0 && chartData.length > 1 && (chartData[0] as number[]).length > 0;
 
 	const options = useMemo((): Partial<uPlot.Options> => {
-		// Stepped path builder for staircase lines (like Grafana)
+		// Stepped path builder for staircase lines (like Grafana) — cumulative only
 		const stepped = (uPlot as unknown as { paths: { stepped: (opts: { align: number }) => uPlot.Series.PathBuilder } }).paths.stepped({ align: 1 });
+		// Spline path builder for smooth curves — per-step only
+		const spline = uPlot.paths.spline?.();
 
 		const series: uPlot.Series[] = [
 			{}, // x-axis (timestamps)
 			...models.map((model, i) => {
 				const color = getModelColor(model, i);
+				if (variant === "per-step") {
+					return {
+						label: model,
+						stroke: color,
+						width: 1.5,
+						fill: withAlpha(color, 0.1),
+						paths: spline,
+						points: { show: false },
+						value: (_u: uPlot, v: number | null) => fmtUSD(v),
+					} satisfies uPlot.Series;
+				}
 				return {
 					label: model,
 					stroke: color,
@@ -54,7 +71,7 @@ export function CostChart({ start, end, step = "300", className }: CostChartProp
 		];
 
 		return {
-			height: 280,
+			height: 240,
 			series,
 			axes: [
 				{
@@ -101,7 +118,7 @@ export function CostChart({ start, end, step = "300", className }: CostChartProp
 			},
 			padding: [12, 12, 0, 0],
 		};
-	}, [models, start, end]);
+	}, [models, start, end, variant]);
 
 	return (
 		<ChartContainer

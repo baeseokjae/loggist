@@ -48,9 +48,15 @@ export function OverviewPage() {
 				/>
 			</div>
 
-			<div className="rounded-xl border bg-card p-6">
-				<h2 className="mb-4 text-base font-semibold">모델별 비용 ({label})</h2>
-				<CostChart start={start} end={end} step={step} />
+			<div className="grid gap-4 lg:grid-cols-2">
+				<div className="rounded-xl border bg-card p-6">
+					<h2 className="mb-4 text-base font-semibold">누적 비용 ({label})</h2>
+					<CostChart start={start} end={end} step={step} variant="cumulative" />
+				</div>
+				<div className="rounded-xl border bg-card p-6">
+					<h2 className="mb-4 text-base font-semibold">구간별 비용 ({label})</h2>
+					<CostChart start={start} end={end} step={step} variant="per-step" />
+				</div>
 			</div>
 
 			<div className="rounded-xl border bg-card p-6">
@@ -60,7 +66,7 @@ export function OverviewPage() {
 
 			<div className="rounded-xl border bg-card p-6">
 				<h2 className="mb-4 text-base font-semibold">캐시 히트율 / API 지연 ({label})</h2>
-				<CacheLatencyChart start={start} end={end} step={step} />
+				<CacheLatencyChart start={start} end={end} step={step} className="overflow-hidden" />
 			</div>
 
 			<RecentErrors />

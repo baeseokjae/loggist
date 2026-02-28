@@ -18,15 +18,26 @@ groups:
       - record: claude_code:token_rate_by_type:5m
         expr: sum by (token_type) (rate(claude_code_token_usage_tokens_total[5m]))
 
-      # Cache hit ratio: cache_read / (cache_read + cache_creation)
+      # Cache hit ratio: cacheRead / (input + cacheRead)
       - record: claude_code:cache_hit_ratio
         expr: >
-          sum(rate(claude_code_cache_read_input_tokens_total[5m]))
+          sum by (profile) (rate(claude_code_token_usage_tokens_total{type="cacheRead"}[5m]))
           /
           (
-            sum(rate(claude_code_cache_read_input_tokens_total[5m]))
+            sum by (profile) (rate(claude_code_token_usage_tokens_total{type="input"}[5m]))
             +
-            sum(rate(claude_code_cache_creation_input_tokens_total[5m]))
+            sum by (profile) (rate(claude_code_token_usage_tokens_total{type="cacheRead"}[5m]))
+          )
+
+      # Cache hit ratio by model
+      - record: claude_code:cache_hit_ratio_by_model
+        expr: >
+          sum by (profile, model) (rate(claude_code_token_usage_tokens_total{type="cacheRead"}[5m]))
+          /
+          (
+            sum by (profile, model) (rate(claude_code_token_usage_tokens_total{type="input"}[5m]))
+            +
+            sum by (profile, model) (rate(claude_code_token_usage_tokens_total{type="cacheRead"}[5m]))
           )
 
       # 5-minute error rate by HTTP status code

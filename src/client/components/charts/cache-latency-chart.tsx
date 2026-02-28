@@ -142,9 +142,9 @@ export function CacheLatencyChart({ start, end, step = "300", className }: Cache
 					values: (_u, vals) => vals.map((v) => (v != null ? `${(v as number).toFixed(1)}s` : "")),
 				},
 			],
-			legend: { show: true },
+			legend: { show: false },
 			cursor: { show: true },
-			padding: [8, 48, 8, 8],
+			padding: [8, 72, 8, 8],
 		};
 	}, [start, end]);
 

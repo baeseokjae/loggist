@@ -15,7 +15,7 @@ export const RANGE_SECONDS: Record<RangeValue, number> = {
 export const RANGE_LABEL: Record<RangeValue, string> = {
 	"1h": "1시간",
 	"6h": "6시간",
-	"24h": "오늘",
+	"24h": "24시간",
 	"7d": "7일",
 	"30d": "30일",
 };

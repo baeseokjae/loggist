@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api-client";
 import { formatPercent } from "../../lib/format";
@@ -17,6 +18,7 @@ interface ToolStat {
 	successCount: number;
 	failureCount: number;
 	successRate: number;
+	topFailureReasons?: Array<{ message: string; count: number }>;
 }
 
 interface ToolDistributionProps {
@@ -46,6 +48,7 @@ export function useToolDistribution(profile: string, start: string, end: string)
 
 export function ToolDistribution({ profile, start, end }: ToolDistributionProps) {
 	const { data: tools, isLoading } = useToolDistribution(profile, start, end);
+	const [expandedTool, setExpandedTool] = useState<string | null>(null);
 
 	if (isLoading) {
 		return (
@@ -82,6 +85,9 @@ export function ToolDistribution({ profile, start, end }: ToolDistributionProps)
 					const pct = maxCalls > 0 ? (tool.totalCalls / maxCalls) * 100 : 0;
 					const failureRate = tool.totalCalls > 0 ? (tool.failureCount / tool.totalCalls) * 100 : 0;
 					const color = MODEL_COLOR_VARS[idx % MODEL_COLOR_VARS.length];
+					const reasons = tool.topFailureReasons ?? [];
+					const hasReasons = tool.failureCount > 0 && reasons.length > 0;
+					const isExpanded = expandedTool === tool.name;
 					return (
 						<div key={tool.name}>
 							<div className="mb-1 flex items-center justify-between text-xs">
@@ -90,9 +96,17 @@ export function ToolDistribution({ profile, start, end }: ToolDistributionProps)
 										{tool.name}
 									</span>
 									{failureRate > 10 && (
-										<span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+										<button
+											type="button"
+											className="flex items-center gap-0.5 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive transition-colors hover:bg-destructive/20"
+											onClick={hasReasons ? () => setExpandedTool(isExpanded ? null : tool.name) : undefined}
+											style={{ cursor: hasReasons ? "pointer" : "default" }}
+										>
 											실패 {formatPercent(failureRate)}
-										</span>
+											{hasReasons && (
+												<span className="ml-0.5 text-[9px]">{isExpanded ? "\u25B2" : "\u25BC"}</span>
+											)}
+										</button>
 									)}
 								</div>
 								<span className="text-muted-foreground">
@@ -105,6 +119,16 @@ export function ToolDistribution({ profile, start, end }: ToolDistributionProps)
 									style={{ width: `${pct}%`, backgroundColor: color }}
 								/>
 							</div>
+							{isExpanded && reasons.length > 0 && (
+								<div className="mt-1.5 space-y-1 rounded-lg bg-destructive/5 px-3 py-2">
+									{reasons.map((r) => (
+										<div key={r.message} className="flex items-start justify-between gap-2 text-[11px]">
+											<span className="text-muted-foreground break-all line-clamp-2">{r.message}</span>
+											<span className="shrink-0 font-medium text-destructive">{r.count}회</span>
+										</div>
+									))}
+								</div>
+							)}
 						</div>
 					);
 				})}

@@ -133,3 +133,50 @@ export function buildCumulativeModelData(
 		models: indices.map((i) => models[i]),
 	};
 }
+
+/** Build per-step (raw increase) per-model data from Prometheus increase() results */
+export function buildPerStepModelData(
+	result: Array<{ metric: Record<string, string>; values?: [number, string][] }>,
+): { data: uPlot.AlignedData; models: string[] } {
+	if (!result.length) return { data: [[], []], models: [] };
+
+	const tsSet = new Set<number>();
+	for (const series of result) {
+		for (const [ts] of series.values ?? []) tsSet.add(ts);
+	}
+
+	const timestamps = Array.from(tsSet).sort((a, b) => a - b);
+	const tsIndex = new Map(timestamps.map((ts, i) => [ts, i]));
+
+	const models: string[] = [];
+	const seriesArrays: (number | null)[][] = [];
+
+	for (const series of result) {
+		const model = series.metric?.model ?? "unknown";
+		models.push(model);
+
+		const raw: (number | null)[] = new Array(timestamps.length).fill(null);
+		for (const [ts, valStr] of series.values ?? []) {
+			const idx = tsIndex.get(ts);
+			if (idx !== undefined) {
+				raw[idx] = Number.parseFloat(valStr);
+			}
+		}
+
+		// Use raw values as-is (no cumulative sum, no forward-fill)
+		seriesArrays.push(raw);
+	}
+
+	// Sort by total sum descending (largest cost model first)
+	const indices = models.map((_, i) => i);
+	indices.sort((a, b) => {
+		const aSum = seriesArrays[a].reduce<number>((acc, v) => acc + (v ?? 0), 0);
+		const bSum = seriesArrays[b].reduce<number>((acc, v) => acc + (v ?? 0), 0);
+		return bSum - aSum;
+	});
+
+	return {
+		data: [timestamps, ...indices.map((i) => seriesArrays[i])] as uPlot.AlignedData,
+		models: indices.map((i) => models[i]),
+	};
+}

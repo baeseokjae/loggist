@@ -18,6 +18,7 @@ interface ToolDistributionResult {
 		successCount: number;
 		failureCount: number;
 		successRate: number;
+		topFailureReasons: Array<{ message: string; count: number }>;
 	}>;
 }
 
@@ -45,18 +46,25 @@ logsRoutes.get("/tool-distribution", async (c) => {
 		const result = await queryLokiRange(query, start, end, 5000);
 
 		const r = result as LokiQueryResult;
-		const toolMap = new Map<string, { totalCalls: number; successCount: number; failureCount: number }>();
+		const toolMap = new Map<string, {
+			totalCalls: number;
+			successCount: number;
+			failureCount: number;
+			errorMessages: Map<string, number>;
+		}>();
 
 		for (const stream of r?.data?.result ?? []) {
 			const labels = stream.stream || {};
 			for (const [, line] of stream.values || []) {
 				let toolName: string | undefined;
 				let success: boolean | undefined;
+				let errorMessage: string | undefined;
 
 				// Try stream labels first (OTel Collector path)
 				if (labels.tool_name) {
 					toolName = labels.tool_name;
 					success = labels.success !== undefined ? labels.success === "true" : undefined;
+					errorMessage = labels.error;
 				} else {
 					// Fallback: parse JSON log line
 					try {
@@ -66,6 +74,8 @@ logsRoutes.get("/tool-distribution", async (c) => {
 						toolName = rawName ? String(rawName) : undefined;
 						const rawSuccess = parsed.success ?? body?.success;
 						success = rawSuccess !== undefined ? Boolean(rawSuccess) : undefined;
+						const rawError = parsed.error ?? body?.error;
+						errorMessage = rawError ? String(rawError) : undefined;
 					} catch {
 						// skip unparseable lines
 					}
@@ -74,10 +84,12 @@ logsRoutes.get("/tool-distribution", async (c) => {
 				if (!toolName) continue;
 				const normalized = toolName.toLowerCase();
 
-				const existing = toolMap.get(normalized) ?? { totalCalls: 0, successCount: 0, failureCount: 0 };
+				const existing = toolMap.get(normalized) ?? { totalCalls: 0, successCount: 0, failureCount: 0, errorMessages: new Map() };
 				existing.totalCalls += 1;
 				if (success === false) {
 					existing.failureCount += 1;
+					const errKey = errorMessage || "알 수 없는 오류";
+					existing.errorMessages.set(errKey, (existing.errorMessages.get(errKey) ?? 0) + 1);
 				} else {
 					existing.successCount += 1;
 				}
@@ -92,6 +104,10 @@ logsRoutes.get("/tool-distribution", async (c) => {
 				successCount: stats.successCount,
 				failureCount: stats.failureCount,
 				successRate: stats.totalCalls > 0 ? stats.successCount / stats.totalCalls : 1,
+				topFailureReasons: Array.from(stats.errorMessages.entries())
+					.sort((a, b) => b[1] - a[1])
+					.slice(0, 5)
+					.map(([message, count]) => ({ message, count })),
 			}))
 			.sort((a, b) => b.totalCalls - a.totalCalls);
 

@@ -47,5 +47,5 @@ export function UPlotWrapper({ data, options, className }: UPlotWrapperProps) {
 		};
 	}, [data, options]);
 
-	return <div ref={containerRef} className={cn("w-full", className)} />;
+	return <div ref={containerRef} className={cn("w-full overflow-hidden", className)} />;
 }

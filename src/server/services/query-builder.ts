@@ -27,6 +27,7 @@ export function buildPromQLQuery(params: {
 	range: string;
 	aggregation?: "sum" | "avg" | "max" | "min";
 	by?: string[];
+	extraLabels?: Record<string, string>;
 }): string {
 	if (!isAllowedMetric(params.metric)) {
 		throw new Error(`Metric not allowed: ${params.metric}`);
@@ -41,6 +42,11 @@ export function buildPromQLQuery(params: {
 	const labels: string[] = [];
 	if (params.profile && params.profile !== "all") {
 		labels.push(`profile="${params.profile}"`);
+	}
+	if (params.extraLabels) {
+		for (const [key, value] of Object.entries(params.extraLabels)) {
+			labels.push(`${key}="${value}"`);
+		}
 	}
 
 	const labelStr = labels.length > 0 ? `{${labels.join(",")}}` : "";

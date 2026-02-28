@@ -124,10 +124,11 @@ async function evaluateDataCollectionStopped(_profile: string): Promise<SignalRe
 // Rule 4: Cache efficiency drop - cache hit ratio < 0.3 for 15 min
 async function evaluateCacheEfficiencyDrop(profile: string): Promise<SignalResult> {
 	const profileFilter = profile === "all" ? "" : `{profile="${profile}"}`;
+	const cacheReadFilter = profile === "all" ? '{type="cacheRead"}' : `{type="cacheRead",profile="${profile}"}`;
 
 	try {
 		const cacheReadResult = await queryPrometheus(
-			`sum(increase(claude_code_cache_read_input_tokens_total${profileFilter}[15m]))`,
+			`sum(increase(claude_code_token_usage_tokens_total${cacheReadFilter}[15m]))`,
 		);
 		const cacheRead = parseScalarValue(cacheReadResult);
 
