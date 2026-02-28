@@ -3,7 +3,7 @@ import { useState } from "react";
 import { parseAsString, useQueryState } from "nuqs";
 import type { SessionEvent, SessionSummary } from "../../shared/types/domain";
 import { Header } from "../components/layout/header";
-import { SessionDetail } from "../components/sessions/session-detail";
+import { SessionDetail, SessionDetailSkeleton } from "../components/sessions/session-detail";
 import { SessionHistogram } from "../components/sessions/session-histogram";
 import { SessionList } from "../components/sessions/session-list";
 import { api } from "../lib/api-client";
@@ -45,7 +45,7 @@ export function SessionsPage() {
 	detailParams.set("end", end);
 	if (profile !== "all") detailParams.set("profile", profile);
 
-	const { data: detail } = useQuery({
+	const { data: detail, isLoading: detailLoading } = useQuery({
 		queryKey: ["session-detail", selectedSession, start, end, profile],
 		queryFn: () =>
 			api.get<{ data: SessionDetailData }>(
@@ -53,6 +53,8 @@ export function SessionsPage() {
 			),
 		select: (res) => res.data,
 		enabled: !!selectedSession,
+		staleTime: 5 * 60 * 1000,
+		gcTime: 30 * 60 * 1000,
 	});
 
 	return (
@@ -93,7 +95,9 @@ export function SessionsPage() {
 				</div>
 
 				<div className="lg:col-span-2">
-					{detail ? (
+					{detailLoading ? (
+						<SessionDetailSkeleton />
+					) : detail ? (
 						<SessionDetail detail={detail} />
 					) : (
 						<div className="flex h-64 items-center justify-center rounded-xl border bg-card">

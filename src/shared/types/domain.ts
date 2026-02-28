@@ -61,6 +61,12 @@ export interface SessionEvent {
 	cost_usd?: number;
 	input_tokens?: number;
 	output_tokens?: number;
+	cache_read_input_tokens?: number;
+	duration_ms?: number;
 	tool_name?: string;
 	success?: boolean;
+	session_id?: string;
+	prompt?: string;
+	error_message?: string;
+	status_code?: number;
 }

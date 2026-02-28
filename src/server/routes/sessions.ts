@@ -106,6 +106,9 @@ interface LogEntry {
 	tool_name?: string;
 	success?: boolean;
 	session_id?: string;
+	prompt?: string;
+	error_message?: string;
+	status_code?: number;
 	raw: string;
 }
 
@@ -120,7 +123,7 @@ function parseLogEntries(result: unknown): LogEntry[] {
 		for (const [ts, line] of stream.values || []) {
 			// First try stream labels (OTel Collector exports metadata as Loki labels)
 			if (labels.event_name) {
-				entries.push({
+				const entry: LogEntry = {
 					timestamp: ts,
 					event_name: labels.event_name,
 					model: labels.model || "",
@@ -135,7 +138,17 @@ function parseLogEntries(result: unknown): LogEntry[] {
 					success: labels.success !== undefined ? labels.success === "true" : undefined,
 					session_id: labels.session_id || "",
 					raw: line,
-				});
+				};
+				if (labels.prompt) {
+					entry.prompt = String(labels.prompt).slice(0, 2000);
+				}
+				if (labels.error_message) {
+					entry.error_message = String(labels.error_message);
+				}
+				if (labels.http_status_code) {
+					entry.status_code = Number(labels.http_status_code);
+				}
+				entries.push(entry);
 				continue;
 			}
 
@@ -143,7 +156,7 @@ function parseLogEntries(result: unknown): LogEntry[] {
 			try {
 				const parsed = JSON.parse(line) as Record<string, unknown>;
 				const body = parsed.body as Record<string, unknown> | undefined;
-				entries.push({
+				const entry: LogEntry = {
 					timestamp: ts,
 					event_name: String(parsed.event_name || body?.event_name || "unknown"),
 					model: String(parsed.model || body?.model || ""),
@@ -163,7 +176,20 @@ function parseLogEntries(result: unknown): LogEntry[] {
 								: undefined,
 					session_id: String(parsed.session_id || body?.session_id || ""),
 					raw: line,
-				});
+				};
+				const promptVal = parsed.prompt || body?.prompt;
+				if (promptVal) {
+					entry.prompt = String(promptVal).slice(0, 2000);
+				}
+				const errorMsg = parsed.error_message || body?.error_message;
+				if (errorMsg) {
+					entry.error_message = String(errorMsg);
+				}
+				const statusCode = parsed.status_code || parsed.http_status_code || body?.status_code || body?.http_status_code;
+				if (statusCode) {
+					entry.status_code = Number(statusCode);
+				}
+				entries.push(entry);
 			} catch {
 				entries.push({
 					timestamp: ts,

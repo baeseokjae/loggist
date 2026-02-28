@@ -1,6 +1,7 @@
 import type { SessionEvent, SessionSummary } from "../../../shared/types/domain";
 import { formatPercent, formatTokens, formatUSD } from "../../lib/format";
 import { cn } from "../../lib/utils";
+import { ConversationTimeline } from "../conversation/conversation-timeline";
 
 interface SessionDetail {
 	sessionId: string;
@@ -32,24 +33,6 @@ function StatCard({ label, value }: { label: string; value: string }) {
 	);
 }
 
-const EVENT_COLORS: Record<string, string> = {
-	api_request: "bg-chart-1",
-	api_error: "bg-destructive",
-	tool_result: "bg-chart-2",
-	tool_decision: "bg-chart-4",
-	user_prompt: "bg-chart-5",
-};
-
-function EventBadge({ type }: { type: string }) {
-	return (
-		<span
-			className={cn(
-				"inline-block h-2 w-2 flex-shrink-0 rounded-full",
-				EVENT_COLORS[type] || "bg-muted-foreground",
-			)}
-		/>
-	);
-}
 
 // ── Cost by Model section ─────────────────────────────────────────────────────
 
@@ -233,38 +216,6 @@ function TokenDetails({ summary }: { summary: SessionSummary }) {
 	);
 }
 
-// ── Event Timeline section ────────────────────────────────────────────────────
-
-function EventTimeline({ events }: { events: SessionEvent[] }) {
-	return (
-		<div className="rounded-xl border bg-card p-4">
-			<h3 className="mb-3 text-sm font-medium">이벤트 타임라인</h3>
-			<div className="max-h-72 space-y-1 overflow-y-auto">
-				{events.map((event, i) => (
-					<div
-						key={`${event.timestamp}-${i}`}
-						className={cn(
-							"flex items-center gap-3 rounded-md px-3 py-1.5 text-sm",
-							event.event_name === "api_error" && "bg-destructive/5",
-							event.event_name === "tool_result" &&
-								event.success === false &&
-								"bg-destructive/5",
-						)}
-					>
-						<EventBadge type={event.event_name} />
-						<span className="flex-1 truncate">
-							{event.tool_name || event.model || event.event_name}
-						</span>
-						{event.cost_usd ? (
-							<span className="text-xs text-muted-foreground">{formatUSD(event.cost_usd)}</span>
-						) : null}
-					</div>
-				))}
-			</div>
-		</div>
-	);
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function SessionDetail({ detail }: SessionDetailProps) {
@@ -291,7 +242,52 @@ export function SessionDetail({ detail }: SessionDetailProps) {
 			<CostByModel events={events} totalCost={summary.totalCost} />
 			<ToolUsage events={events} />
 			<TokenDetails summary={summary} />
-			<EventTimeline events={events} />
+			<ConversationTimeline events={events} />
+		</div>
+	);
+}
+
+// ── Loading Skeleton ─────────────────────────────────────────────────────────
+
+export function SessionDetailSkeleton() {
+	return (
+		<div className="space-y-4 animate-pulse">
+			{/* Stat cards skeleton */}
+			<div className="grid grid-cols-4 gap-3">
+				{Array.from({ length: 4 }).map((_, i) => (
+					<div key={i} className="rounded-lg border bg-card p-3">
+						<div className="h-3 w-16 rounded bg-muted mb-2" />
+						<div className="h-6 w-20 rounded bg-muted" />
+					</div>
+				))}
+			</div>
+
+			{/* Section skeletons */}
+			{Array.from({ length: 2 }).map((_, i) => (
+				<div key={i} className="rounded-xl border bg-card p-4">
+					<div className="h-4 w-24 rounded bg-muted mb-3" />
+					<div className="space-y-2">
+						<div className="h-3 w-full rounded bg-muted" />
+						<div className="h-3 w-3/4 rounded bg-muted" />
+					</div>
+				</div>
+			))}
+
+			{/* Turn skeletons */}
+			<div className="space-y-2">
+				{Array.from({ length: 3 }).map((_, i) => (
+					<div key={i} className="rounded-xl border bg-card p-4">
+						<div className="flex items-center gap-3">
+							<div className="h-5 w-14 rounded bg-muted" />
+							<div className="h-4 flex-1 rounded bg-muted" />
+							<div className="flex gap-2">
+								<div className="h-5 w-12 rounded bg-muted" />
+								<div className="h-5 w-12 rounded bg-muted" />
+							</div>
+						</div>
+					</div>
+				))}
+			</div>
 		</div>
 	);
 }
