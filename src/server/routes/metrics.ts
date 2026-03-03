@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { ALLOWED_PERIODS, ALLOWED_PROFILES } from "../../shared/constants";
+import { ALLOWED_PERIODS, isValidProfile } from "../../shared/constants";
 import { getQueries } from "../db/queries";
 import { downsample } from "../services/downsampler";
 import { queryPrometheus, queryPrometheusRange } from "../services/prometheus";
@@ -133,7 +133,7 @@ metricsRoutes.get("/cache-savings", async (c) => {
 	const profile = c.req.query("profile") || "all";
 	const range = c.req.query("range") || "24h";
 
-	if (!(ALLOWED_PROFILES as readonly string[]).includes(profile)) {
+	if (!isValidProfile(profile)) {
 		return c.json({ error: "Invalid profile" }, 400);
 	}
 	if (!(ALLOWED_PERIODS as readonly string[]).includes(range)) {
@@ -208,7 +208,7 @@ metricsRoutes.get("/model-comparison", async (c) => {
 	const profile = c.req.query("profile") || "all";
 	const range = c.req.query("range") || "24h";
 
-	if (!(ALLOWED_PROFILES as readonly string[]).includes(profile)) {
+	if (!isValidProfile(profile)) {
 		return c.json({ error: "Invalid profile" }, 400);
 	}
 	if (!(ALLOWED_PERIODS as readonly string[]).includes(range)) {
@@ -290,7 +290,7 @@ metricsRoutes.get("/model-comparison", async (c) => {
 metricsRoutes.get("/profiles", async (c) => {
 	try {
 		const result = (await queryPrometheus(
-			`group by (profile) (claude_code_cost_usage_USD_total)`,
+			`group by (profile) ({__name__=~"claude_code_.+", profile!=""})`,
 		)) as PrometheusResult;
 
 		const profileSet = new Set<string>();
@@ -312,7 +312,7 @@ metricsRoutes.get("/error-summary", async (c) => {
 	const profile = c.req.query("profile") || "all";
 	const range = c.req.query("range") || "24h";
 
-	if (!(ALLOWED_PROFILES as readonly string[]).includes(profile)) {
+	if (!isValidProfile(profile)) {
 		return c.json({ error: "Invalid profile" }, 400);
 	}
 	if (!(ALLOWED_PERIODS as readonly string[]).includes(range)) {

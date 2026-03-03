@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { PROFILE_LABEL, PROFILE_VALUES, useProfileFilter, useProfiles } from "../../stores/profile-filter";
+import { PROFILE_LABEL, useProfileFilter, useProfiles } from "../../stores/profile-filter";
 import { RANGE_LABEL, RANGE_VALUES, useTimeRange } from "../../stores/time-range";
 
 interface HeaderProps {
@@ -12,10 +12,7 @@ export function Header({ title, children }: HeaderProps) {
 	const { profile, setProfile } = useProfileFilter();
 	const { data: dynamicProfiles } = useProfiles();
 
-	// Use dynamic profiles if loaded, otherwise fall back to hardcoded list
-	const profileOptions: string[] = dynamicProfiles && dynamicProfiles.length > 0
-		? dynamicProfiles
-		: [...PROFILE_VALUES];
+	const profileOptions = dynamicProfiles ?? ["all"];
 
 	return (
 		<div className="flex items-center justify-between">

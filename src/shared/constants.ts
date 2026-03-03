@@ -1,5 +1,8 @@
-export const ALLOWED_PROFILES = ["all", "claude-b", "claude-p"] as const;
-export type AllowedProfile = (typeof ALLOWED_PROFILES)[number];
+/** Profile names must be "all" or alphanumeric/hyphens/underscores only (PromQL injection prevention) */
+const SAFE_PROFILE_RE = /^[a-zA-Z0-9_-]+$/;
+export function isValidProfile(p: string): boolean {
+	return p === "all" || SAFE_PROFILE_RE.test(p);
+}
 
 export const ALLOWED_PERIODS = ["5m", "15m", "1h", "6h", "24h", "7d", "30d"] as const;
 export type AllowedPeriod = (typeof ALLOWED_PERIODS)[number];

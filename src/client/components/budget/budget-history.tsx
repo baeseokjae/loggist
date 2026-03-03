@@ -7,6 +7,7 @@ import { UPlotWrapper } from "../charts/uplot-wrapper";
 
 interface BudgetHistoryProps {
 	dailyBudget?: number;
+	profile?: string;
 }
 
 function buildOptions(dailyBudget: number | undefined): Partial<uPlot.Options> {
@@ -88,7 +89,7 @@ function buildOptions(dailyBudget: number | undefined): Partial<uPlot.Options> {
 	};
 }
 
-export function BudgetHistory({ dailyBudget }: BudgetHistoryProps) {
+export function BudgetHistory({ dailyBudget, profile }: BudgetHistoryProps) {
 	const { start, end } = useMemo(() => {
 		const KST_OFFSET_SEC = 9 * 3600;
 		const nowSec = Math.floor(Date.now() / 1000);
@@ -101,7 +102,7 @@ export function BudgetHistory({ dailyBudget }: BudgetHistoryProps) {
 		};
 	}, []);
 
-	const { data: result, isLoading, isError } = useMetricRangeQuery("cost", start, end, "86400", "all", "increase");
+	const { data: result, isLoading, isError } = useMetricRangeQuery("cost", start, end, "86400", profile ?? "all", "increase");
 
 	const chartData = useMemo(() => buildAlignedData(result ?? []), [result]);
 	const options = useMemo(() => buildOptions(dailyBudget), [dailyBudget]);

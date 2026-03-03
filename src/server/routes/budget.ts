@@ -8,7 +8,11 @@ export const budgetRoutes = new Hono();
 // GET /api/budget - List all budgets
 budgetRoutes.get("/", (c) => {
 	const q = getQueries();
-	const budgets = q.getAllBudgets.all();
+	const profile = c.req.query("profile");
+	const budgets = q.getAllBudgets.all() as Array<{ profile: string; [key: string]: unknown }>;
+	if (profile && profile !== "all") {
+		return c.json({ data: budgets.filter((b) => b.profile === profile || b.profile === "all") });
+	}
 	return c.json({ data: budgets });
 });
 

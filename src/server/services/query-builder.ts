@@ -1,20 +1,19 @@
 import {
 	ALLOWED_METRICS,
-	ALLOWED_PROFILES,
 	ALLOWED_PERIODS,
 	ALLOWED_EVENT_TYPES,
+	isValidProfile,
 } from "../../shared/constants";
 
 type AllowedMetric = (typeof ALLOWED_METRICS)[number];
-type AllowedProfile = (typeof ALLOWED_PROFILES)[number];
 type AllowedPeriod = (typeof ALLOWED_PERIODS)[number];
 
 export function isAllowedMetric(m: string): m is AllowedMetric {
 	return (ALLOWED_METRICS as readonly string[]).includes(m);
 }
 
-export function isAllowedProfile(p: string): p is AllowedProfile {
-	return (ALLOWED_PROFILES as readonly string[]).includes(p);
+export function isAllowedProfile(p: string): boolean {
+	return isValidProfile(p);
 }
 
 export function isAllowedPeriod(p: string): p is AllowedPeriod {

@@ -1,3 +1,5 @@
+import { PROFILE_LABEL, useProfiles } from "../../stores/profile-filter";
+
 const EVENT_TYPES = [
 	{ value: "api_request", label: "API 요청" },
 	{ value: "api_error", label: "API 오류" },
@@ -6,13 +8,7 @@ const EVENT_TYPES = [
 	{ value: "user_prompt", label: "사용자 프롬프트" },
 ] as const;
 
-const PROFILES = [
-	{ value: "all", label: "전체" },
-	{ value: "claude-b", label: "claude-b" },
-	{ value: "claude-p", label: "claude-p" },
-] as const;
-
-export type ProfileValue = (typeof PROFILES)[number]["value"];
+export type ProfileValue = string;
 
 interface FilterPanelProps {
 	selectedEventTypes: string[];
@@ -27,6 +23,9 @@ export function FilterPanel({
 	profile,
 	onProfileChange,
 }: FilterPanelProps) {
+	const { data: profiles } = useProfiles();
+	const profileOptions = profiles ?? ["all"];
+
 	function toggleEventType(type: string) {
 		if (selectedEventTypes.includes(type)) {
 			onEventTypesChange(selectedEventTypes.filter((t) => t !== type));
@@ -59,9 +58,9 @@ export function FilterPanel({
 					onChange={(e) => onProfileChange(e.target.value as ProfileValue)}
 					className="h-7 rounded border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring"
 				>
-					{PROFILES.map((p) => (
-						<option key={p.value} value={p.value}>
-							{p.label}
+					{profileOptions.map((p) => (
+						<option key={p} value={p}>
+							{PROFILE_LABEL[p] ?? p}
 						</option>
 					))}
 				</select>

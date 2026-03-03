@@ -14,10 +14,11 @@ interface AlertListResponse {
 	data: BudgetAlert[];
 }
 
-export function useBudgets() {
+export function useBudgets(profile?: string) {
+	const params = profile && profile !== "all" ? `?profile=${profile}` : "";
 	return useQuery({
-		queryKey: ["budgets"],
-		queryFn: () => api.get<BudgetListResponse>("/budget"),
+		queryKey: ["budgets", profile ?? "all"],
+		queryFn: () => api.get<BudgetListResponse>(`/budget${params}`),
 		select: (res) => res.data,
 	});
 }
