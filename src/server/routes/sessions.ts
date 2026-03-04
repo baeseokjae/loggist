@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { getDB } from "../db/index";
 import { queryLokiRange } from "../services/loki";
+import { findSession, getFileMtime, validateSessionId } from "../services/jsonl-finder";
+import { FileTooLargeError, paginateConversation, parseJsonlFile } from "../services/jsonl-parser";
+import { getCached, setCached } from "../services/conversation-cache";
 import type { SessionSummary } from "../../shared/types/domain";
 import type { LokiQueryResult } from "../../shared/types/loki";
 
@@ -69,6 +72,43 @@ sessionsRoutes.post("/backfill-titles", async (c) => {
 		return c.json({ data: { backfilled: count } });
 	} catch (error) {
 		return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+	}
+});
+
+// GET /api/sessions/:id/conversation - Get JSONL conversation data
+sessionsRoutes.get("/:id/conversation", async (c) => {
+	const sessionId = c.req.param("id");
+
+	if (!validateSessionId(sessionId)) {
+		return c.json({ error: "잘못된 세션 ID 형식입니다." }, 400);
+	}
+
+	const offset = Math.max(0, Number(c.req.query("offset")) || 0);
+	const limit = Math.min(Math.max(1, Number(c.req.query("limit")) || 300), 1000);
+
+	try {
+		const session = await findSession(sessionId);
+		if (!session) {
+			return c.json({ error: "대화 파일을 찾을 수 없습니다." }, 404);
+		}
+
+		const mtime = await getFileMtime(session.filePath);
+		let fullData = getCached(sessionId, mtime);
+		if (!fullData) {
+			fullData = await parseJsonlFile(session.filePath, session.fileSize);
+			setCached(sessionId, fullData, mtime);
+		}
+
+		const paginated = paginateConversation(fullData, offset, limit);
+		return c.json({ data: paginated });
+	} catch (error) {
+		if (error instanceof FileTooLargeError) {
+			return c.json({ error: error.message }, 413);
+		}
+		return c.json(
+			{ error: error instanceof Error ? error.message : String(error) },
+			500,
+		);
 	}
 });
 

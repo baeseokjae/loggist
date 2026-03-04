@@ -12,8 +12,10 @@ services:
       - LOKI_URL=http://loki:3100
       - NODE_ENV=production
       - PORT=3000
+      - CLAUDE_PROJECTS_DIR=/data/claude-projects
     volumes:
       - loggist_data:/app/data
+      - ${CLAUDE_PROJECTS_DIR:-~/.claude/projects}:/data/claude-projects:ro
     networks:
       - frontend
       - backend

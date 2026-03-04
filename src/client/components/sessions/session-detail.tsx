@@ -1,7 +1,10 @@
+import * as Tabs from "@radix-ui/react-tabs";
 import type { SessionEvent, SessionSummary } from "../../../shared/types/domain";
 import { formatPercent, formatTokens, formatUSD } from "../../lib/format";
 import { cn } from "../../lib/utils";
+import { useConversation } from "../../hooks/use-conversation";
 import { ConversationTimeline } from "../conversation/conversation-timeline";
+import { ConversationView } from "../conversation/conversation-view";
 
 interface SessionDetail {
 	sessionId: string;
@@ -220,12 +223,16 @@ function TokenDetails({ summary }: { summary: SessionSummary }) {
 
 export function SessionDetail({ detail }: SessionDetailProps) {
 	const { summary, events } = detail;
+	const { data: conversation, isLoading: convLoading } = useConversation(detail.sessionId);
 
 	const toolDecisionEvents = events.filter((e) => e.event_name === "tool_decision");
 	const editAccepts = toolDecisionEvents.filter((e) => e.success === true).length;
 	const editRejects = toolDecisionEvents.filter((e) => e.success === false).length;
 	const editTotal = editAccepts + editRejects;
 	const editAcceptRatio = editTotal > 0 ? (editAccepts / editTotal) * 100 : null;
+
+	const hasConversation = !!conversation;
+	const defaultTab = hasConversation ? "conversation" : "telemetry";
 
 	return (
 		<div className="space-y-4">
@@ -242,7 +249,51 @@ export function SessionDetail({ detail }: SessionDetailProps) {
 			<CostByModel events={events} totalCost={summary.totalCost} />
 			<ToolUsage events={events} />
 			<TokenDetails summary={summary} />
-			<ConversationTimeline events={events} />
+
+			<Tabs.Root defaultValue={defaultTab}>
+				<Tabs.List className="flex gap-1 border-b">
+					<Tabs.Trigger
+						value="telemetry"
+						className="px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-medium"
+					>
+						텔레메트리
+					</Tabs.Trigger>
+					<Tabs.Trigger
+						value="conversation"
+						className="px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-medium"
+					>
+						대화 내용
+						{convLoading && (
+							<span className="ml-1.5 inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+						)}
+					</Tabs.Trigger>
+				</Tabs.List>
+
+				<Tabs.Content value="telemetry" className="pt-4">
+					<ConversationTimeline events={events} />
+				</Tabs.Content>
+
+				<Tabs.Content value="conversation" className="pt-4">
+					{conversation ? (
+						<ConversationView data={conversation} />
+					) : convLoading ? (
+						<div className="flex h-32 items-center justify-center">
+							<span className="text-sm text-muted-foreground">
+								대화 데이터를 불러오는 중...
+							</span>
+						</div>
+					) : (
+						<div className="rounded-lg border border-dashed p-6 text-center">
+							<p className="text-sm text-muted-foreground">
+								이 세션의 JSONL 대화 파일을 찾을 수 없습니다.
+							</p>
+							<p className="mt-1 text-xs text-muted-foreground">
+								~/.claude/projects 디렉토리에 해당 세션의 JSONL 파일이 있는지 확인하세요.
+							</p>
+						</div>
+					)}
+				</Tabs.Content>
+			</Tabs.Root>
 		</div>
 	);
 }
