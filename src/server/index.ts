@@ -5,14 +5,12 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { getDB, initDB } from "./db/index";
-import { authMiddleware } from "./middleware/auth";
 import { errorHandler } from "./middleware/error-handler";
 import { createRateLimiter } from "./middleware/rate-limit";
 import { securityHeaders } from "./middleware/security-headers";
 import { startLokiTail } from "./realtime/loki-tail";
 import { initSessionTitleCache } from "./realtime/session-title-cache";
 import { initFanout } from "./realtime/sse-fanout";
-import { authRoutes, migratePasswordFromEnv } from "./routes/auth";
 import { budgetRoutes } from "./routes/budget";
 import { eventsRoutes } from "./routes/events";
 import { logsRoutes } from "./routes/logs";
@@ -25,13 +23,10 @@ import { startSignalEvaluator } from "./workers/signal-evaluator";
 const app = new Hono();
 
 initDB();
-await migratePasswordFromEnv();
 
 app.use("*", securityHeaders);
 app.use("*", logger());
 app.onError(errorHandler);
-
-app.route("/api/auth", authRoutes);
 
 app.get("/api/health", async (c) => {
 	const prometheusUrl = process.env.PROMETHEUS_URL || "http://localhost:9090";
@@ -74,7 +69,6 @@ app.get("/api/health", async (c) => {
 	return c.json({ status: "ok", uptime: process.uptime(), checks });
 });
 
-app.use("/api/*", authMiddleware);
 app.use("/api/*", createRateLimiter());
 app.route("/api/budget", budgetRoutes);
 app.route("/api/sessions", sessionsRoutes);

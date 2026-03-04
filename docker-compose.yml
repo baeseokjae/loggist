@@ -7,7 +7,6 @@ services:
     ports:
       - "127.0.0.1:3001:3000"
     environment:
-      - LOGGIST_JWT_SECRET=${LOGGIST_JWT_SECRET:-change-me-please}
       - PROMETHEUS_URL=http://prometheus:9090
       - LOKI_URL=http://loki:3100
       - NODE_ENV=production
