@@ -1,6 +1,7 @@
 import type {
 	ContentBlock,
 	ConversationMessage,
+	DisplayBlock,
 	ToolUseBlock,
 	ToolResultBlock,
 } from "../../shared/types/conversation";
@@ -14,6 +15,7 @@ export interface ConversationGroup {
 		toolUse: ToolUseBlock;
 		toolResult: ToolResultBlock | null;
 	}>;
+	orderedBlocks: DisplayBlock[];
 	model: string;
 	timestamp: string;
 }
@@ -44,23 +46,30 @@ export function groupMessagesIntoTurns(
 		let model = "";
 		const toolUses: ToolUseBlock[] = [];
 		const toolResults = new Map<string, ToolResultBlock>();
+		const orderedBlocks: DisplayBlock[] = [];
 
-		while (i < messages.length && messages[i].type === "assistant") {
-			const aMsg = messages[i];
+		const collectAssistantBlocks = (aMsg: ConversationMessage) => {
 			if (aMsg.model) model = aMsg.model;
-
 			for (const block of aMsg.content) {
 				if (block.type === "text") {
 					assistantText += (assistantText ? "\n" : "") + block.text;
+					if (block.text.trim()) {
+						orderedBlocks.push({ kind: "text", text: block.text });
+					}
 				} else if (block.type === "thinking") {
 					thinkingText =
 						(thinkingText ? thinkingText + "\n" : "") + block.thinking;
 				} else if (block.type === "tool_use") {
 					toolUses.push(block);
+					orderedBlocks.push({ kind: "tool_call", toolUse: block, toolResult: null });
 				} else if (block.type === "tool_result") {
 					toolResults.set(block.tool_use_id, block);
 				}
 			}
+		};
+
+		while (i < messages.length && messages[i].type === "assistant") {
+			collectAssistantBlocks(messages[i]);
 			i++;
 		}
 
@@ -79,22 +88,15 @@ export function groupMessagesIntoTurns(
 
 			// After tool results, collect more assistant messages
 			while (i < messages.length && messages[i].type === "assistant") {
-				const aMsg = messages[i];
-				if (aMsg.model) model = aMsg.model;
-
-				for (const block of aMsg.content) {
-					if (block.type === "text") {
-						assistantText += (assistantText ? "\n" : "") + block.text;
-					} else if (block.type === "thinking") {
-						thinkingText =
-							(thinkingText ? thinkingText + "\n" : "") + block.thinking;
-					} else if (block.type === "tool_use") {
-						toolUses.push(block);
-					} else if (block.type === "tool_result") {
-						toolResults.set(block.tool_use_id, block);
-					}
-				}
+				collectAssistantBlocks(messages[i]);
 				i++;
+			}
+		}
+
+		// Patch tool_result into orderedBlocks
+		for (const block of orderedBlocks) {
+			if (block.kind === "tool_call") {
+				block.toolResult = toolResults.get(block.toolUse.id) ?? null;
 			}
 		}
 
@@ -111,6 +113,7 @@ export function groupMessagesIntoTurns(
 				assistantText,
 				thinkingText,
 				toolCalls,
+				orderedBlocks,
 				model,
 				timestamp,
 			});

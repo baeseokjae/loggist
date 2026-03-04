@@ -29,6 +29,10 @@ export type ContentBlock =
 	| ToolUseBlock
 	| ToolResultBlock;
 
+export type DisplayBlock =
+	| { kind: "text"; text: string }
+	| { kind: "tool_call"; toolUse: ToolUseBlock; toolResult: ToolResultBlock | null };
+
 export interface ConversationMessage {
 	uuid: string;
 	parentUuid: string | null;

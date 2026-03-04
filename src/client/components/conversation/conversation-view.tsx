@@ -4,7 +4,7 @@ import {
 	type ConversationGroup,
 	groupMessagesIntoTurns,
 } from "../../lib/conversation-groups";
-import { cn } from "../../lib/utils";
+import { MarkdownContent } from "./markdown-content";
 import { ToolUseCard } from "./tool-use-card";
 
 interface ConversationViewProps {
@@ -128,30 +128,25 @@ function TurnCard({
 						</div>
 					)}
 
-					{/* Assistant text */}
-					{group.assistantText && (
-						<div className="rounded-lg border bg-background/50 p-3 text-sm whitespace-pre-wrap break-words">
-							{group.assistantText}
-						</div>
-					)}
-
-					{/* Tool calls */}
-					{group.toolCalls.length > 0 && (
-						<div>
-							<p className="mb-2 text-xs font-medium text-muted-foreground">
-								도구 호출 ({group.toolCalls.length})
-							</p>
-							<div>
-								{group.toolCalls.map((tc) => (
-									<ToolUseCard
-										key={tc.toolUse.id}
-										toolUse={tc.toolUse}
-										toolResult={tc.toolResult}
-									/>
-								))}
-							</div>
-						</div>
-					)}
+					{/* Assistant text & tool calls (interleaved) */}
+					{group.orderedBlocks.map((block, idx) => {
+						if (block.kind === "text") {
+							return (
+								<MarkdownContent
+									key={`text-${idx}`}
+									content={block.text}
+									className="rounded-lg border bg-background/50 p-3"
+								/>
+							);
+						}
+						return (
+							<ToolUseCard
+								key={block.toolUse.id}
+								toolUse={block.toolUse}
+								toolResult={block.toolResult}
+							/>
+						);
+					})}
 				</div>
 			)}
 		</div>

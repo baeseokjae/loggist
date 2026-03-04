@@ -12,7 +12,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const MAX_STRING_LENGTH = 5000;
 const ALLOWED_TYPES = new Set(["user", "assistant"]);
 
-interface RawLine {
+export interface RawLine {
 	type: string;
 	uuid: string;
 	parentUuid: string | null;
@@ -125,7 +125,7 @@ export function paginateConversation(
 	};
 }
 
-function mergeStreamingChunks(
+export function mergeStreamingChunks(
 	rawMessages: RawLine[],
 ): ConversationMessage[] {
 	const result: ConversationMessage[] = [];
@@ -145,68 +145,38 @@ function mergeStreamingChunks(
 	const mergedAssistants = new Map<string, ConversationMessage>();
 
 	for (const [requestId, group] of requestGroups) {
-		// Collect all unique content blocks across chunks
-		const allBlocks: ContentBlock[] = [];
-		const seenToolUseIds = new Set<string>();
 		let model = "";
 		let stopReason: string | undefined;
-
-		// Process in order; last chunk has the most complete data
 		for (const msg of group) {
 			if (msg.message?.model) model = msg.message.model;
 			if (msg.message?.stop_reason) stopReason = msg.message.stop_reason;
+		}
 
+		// Merge all chunks in order, deduplicating tool_use by id and keeping first thinking
+		const lastMsg = group[group.length - 1];
+		const finalContent: ContentBlock[] = [];
+		const seenToolUseIds = new Set<string>();
+		let hasThinking = false;
+
+		for (const msg of group) {
 			const content = normalizeContent(msg.message?.content);
 			for (const block of content) {
 				if (block.type === "tool_use") {
 					if (!seenToolUseIds.has(block.id)) {
 						seenToolUseIds.add(block.id);
-						allBlocks.push(block);
+						finalContent.push(block);
 					}
 				} else if (block.type === "thinking") {
-					// Deduplicate thinking blocks: later chunks contain the full text,
-					// so replace any earlier thinking block with the latest one
-					const existingIdx = allBlocks.findIndex(
-						(b) => b.type === "thinking",
-					);
-					if (existingIdx >= 0) {
-						// Keep the longer (more complete) thinking block
-						const existing = allBlocks[existingIdx];
-						if (
-							existing.type === "thinking" &&
-							block.thinking.length >= existing.thinking.length
-						) {
-							allBlocks[existingIdx] = block;
-						}
-					} else {
-						allBlocks.push(block);
-					}
-				} else if (block.type === "text") {
-					// Streaming chunks progressively build up text.
-					// Later chunks from the same requestId contain the full text,
-					// so replace any existing text block with the latest one.
-					const existingIdx = allBlocks.findIndex(
-						(b) => b.type === "text",
-					);
-					if (existingIdx >= 0) {
-						// Keep the longer (more complete) text
-						const existing = allBlocks[existingIdx];
-						if (
-							existing.type === "text" &&
-							block.text.length >= existing.text.length
-						) {
-							allBlocks[existingIdx] = block;
-						}
-					} else {
-						allBlocks.push(block);
+					if (!hasThinking) {
+						hasThinking = true;
+						finalContent.push(block);
 					}
 				} else {
-					allBlocks.push(block);
+					finalContent.push(block);
 				}
 			}
 		}
 
-		const lastMsg = group[group.length - 1];
 		const merged: ConversationMessage = {
 			uuid: lastMsg.uuid,
 			parentUuid: group[0].parentUuid,
@@ -217,7 +187,7 @@ function mergeStreamingChunks(
 			slug: lastMsg.slug,
 			type: "assistant",
 			model,
-			content: sanitizeBlocks(allBlocks),
+			content: sanitizeBlocks(finalContent),
 			stopReason,
 		};
 
