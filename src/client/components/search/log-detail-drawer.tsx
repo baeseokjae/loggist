@@ -5,6 +5,7 @@ import type { LogEntry } from "../../../shared/types/domain";
 import { EVENT_TYPE_CONFIG } from "../../lib/constants";
 import { formatNanoTimestamp, formatTokens, formatUSD } from "../../lib/format";
 import { cn } from "../../lib/utils";
+import { TaggedContent } from "../conversation/tagged-content";
 import { SessionMinimap } from "./session-minimap";
 
 interface LogDetailDrawerProps {
@@ -240,9 +241,9 @@ export function LogDetailDrawer({ entry, onClose, onNavigate }: LogDetailDrawerP
 									<h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
 										프롬프트
 									</h3>
-									<pre className="whitespace-pre-wrap break-words rounded border bg-muted/30 px-3 py-2 text-xs leading-relaxed">
-										{entry.prompt}
-									</pre>
+									<div className="rounded border bg-muted/30 px-3 py-2 text-xs leading-relaxed">
+										<TaggedContent content={entry.prompt!} />
+									</div>
 								</section>
 							)}
 

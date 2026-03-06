@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import type { UnifiedTurn } from "../../lib/turn-matcher";
 import { formatPercent, formatTokens, formatUSD } from "../../lib/format";
+import { stripTags } from "../../lib/tag-parser";
 import { MarkdownContent } from "./markdown-content";
+import { TaggedContent } from "./tagged-content";
 import { ToolUseCard } from "./tool-use-card";
 import { EventItem } from "./event-item";
 
@@ -30,7 +32,7 @@ export function UnifiedTurnCard({ turn, forceExpanded }: UnifiedTurnCardProps) {
 	const { conversation, telemetry } = turn;
 
 	const promptPreview = conversation.userContent
-		? conversation.userContent.split("\n").slice(0, 2).join(" ").slice(0, 120)
+		? stripTags(conversation.userContent).split("\n").slice(0, 2).join(" ").slice(0, 120)
 		: null;
 
 	const formattedTime = conversation.timestamp
@@ -163,8 +165,8 @@ export function UnifiedTurnCard({ turn, forceExpanded }: UnifiedTurnCardProps) {
 								<span>사용자 입력</span>
 							</button>
 							{promptExpanded && (
-								<div className="rounded-lg border bg-purple-50 dark:bg-purple-950/20 p-3 text-sm whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
-									{conversation.userContent}
+								<div className="rounded-lg border bg-purple-50 dark:bg-purple-950/20 p-3 text-sm max-h-64 overflow-y-auto">
+									<TaggedContent content={conversation.userContent!} />
 								</div>
 							)}
 						</div>

@@ -4,6 +4,7 @@ import type {
 	ToolUseBlock,
 } from "../../../shared/types/conversation";
 import { cn } from "../../lib/utils";
+import { TaggedContent } from "./tagged-content";
 
 interface ToolUseCardProps {
 	toolUse: ToolUseBlock;
@@ -182,16 +183,16 @@ export function ToolUseCard({ toolUse, toolResult }: ToolUseCardProps) {
 								<p className="mb-1 text-[10px] font-medium uppercase text-muted-foreground">
 									결과 {toolResult.is_error && "(오류)"}
 								</p>
-								<pre
+								<div
 									className={cn(
-										"max-h-64 overflow-auto rounded border p-2 text-xs whitespace-pre-wrap break-words",
+										"max-h-64 overflow-auto rounded border p-2 text-xs",
 										toolResult.is_error
 											? "bg-red-50 dark:bg-red-950/20"
 											: "bg-background/50",
 									)}
 								>
-									{toolResult.content}
-								</pre>
+									<TaggedContent content={toolResult.content} />
+								</div>
 							</div>
 						)}
 					</div>

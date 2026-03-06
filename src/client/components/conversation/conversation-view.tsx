@@ -4,7 +4,9 @@ import {
 	type ConversationGroup,
 	groupMessagesIntoTurns,
 } from "../../lib/conversation-groups";
+import { stripTags } from "../../lib/tag-parser";
 import { MarkdownContent } from "./markdown-content";
+import { TaggedContent } from "./tagged-content";
 import { ToolUseCard } from "./tool-use-card";
 
 interface ConversationViewProps {
@@ -27,7 +29,7 @@ function TurnCard({
 	const isExpanded = expanded || forceExpanded;
 
 	const promptPreview = group.userContent
-		? group.userContent.split("\n").slice(0, 2).join(" ").slice(0, 120)
+		? stripTags(group.userContent).split("\n").slice(0, 2).join(" ").slice(0, 120)
 		: null;
 
 	const formattedTime = group.timestamp
@@ -102,8 +104,8 @@ function TurnCard({
 								<span>사용자 입력</span>
 							</button>
 							{promptExpanded && (
-								<div className="rounded-lg border bg-purple-50 dark:bg-purple-950/20 p-3 text-sm whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
-									{group.userContent}
+								<div className="rounded-lg border bg-purple-50 dark:bg-purple-950/20 p-3 text-sm max-h-64 overflow-y-auto">
+									<TaggedContent content={group.userContent!} />
 								</div>
 							)}
 						</div>

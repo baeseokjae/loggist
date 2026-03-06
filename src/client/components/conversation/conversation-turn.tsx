@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { formatNanoTimestamp, formatUSD } from "../../lib/format";
+import { stripTags } from "../../lib/tag-parser";
 import type { ConversationTurn } from "../../lib/conversation";
 import { EventItem } from "./event-item";
+import { TaggedContent } from "./tagged-content";
 
 const INITIAL_VISIBLE = 15;
 
@@ -29,7 +31,7 @@ export function ConversationTurnCard({ turn, visibleTypes, forceExpanded }: Conv
 	const hiddenCount = filteredEvents.length - INITIAL_VISIBLE;
 
 	const promptPreview = turn.prompt
-		? turn.prompt.split("\n").slice(0, 2).join(" ").slice(0, 120)
+		? stripTags(turn.prompt).split("\n").slice(0, 2).join(" ").slice(0, 120)
 		: null;
 
 	return (
@@ -106,8 +108,8 @@ export function ConversationTurnCard({ turn, visibleTypes, forceExpanded }: Conv
 								<span>프롬프트 전문</span>
 							</button>
 							{promptExpanded && (
-								<div className="rounded-lg border bg-muted/30 p-3 text-sm whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
-									{turn.prompt}
+								<div className="rounded-lg border bg-muted/30 p-3 text-sm max-h-64 overflow-y-auto">
+									<TaggedContent content={turn.prompt!} />
 								</div>
 							)}
 						</div>
