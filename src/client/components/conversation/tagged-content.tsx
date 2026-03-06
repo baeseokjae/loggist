@@ -2,6 +2,7 @@ import { memo, useState } from "react";
 import { cn } from "../../lib/utils";
 import { parseTaggedTextMemo, containsTags } from "../../lib/tag-parser";
 import type { ParsedSegment, TagName } from "../../lib/tag-parser";
+import { MarkdownContent } from "./markdown-content";
 
 type TagSegment = Extract<ParsedSegment, { kind: "tag" }>;
 
@@ -206,9 +207,7 @@ function StandardBlock({
 function SegmentRenderer({ segment }: { segment: ParsedSegment }) {
 	if (segment.kind === "text") {
 		if (!segment.content) return null;
-		return (
-			<span className="whitespace-pre-wrap">{segment.content}</span>
-		);
+		return <MarkdownContent content={segment.content} />;
 	}
 
 	const style = TAG_STYLES[segment.tagName];
@@ -248,11 +247,7 @@ export const TaggedContent = memo(function TaggedContent({
 	className,
 }: TaggedContentProps) {
 	if (!containsTags(content)) {
-		return (
-			<div className={cn("whitespace-pre-wrap break-words", className)}>
-				{content}
-			</div>
-		);
+		return <MarkdownContent content={content} className={className} />;
 	}
 
 	const segments = parseTaggedTextMemo(content);
