@@ -4,7 +4,6 @@ import type {
 	ToolUseBlock,
 } from "../../../shared/types/conversation";
 import { cn } from "../../lib/utils";
-import { TaggedContent } from "./tagged-content";
 
 interface ToolUseCardProps {
 	toolUse: ToolUseBlock;
@@ -191,7 +190,7 @@ export function ToolUseCard({ toolUse, toolResult }: ToolUseCardProps) {
 											: "bg-background/50",
 									)}
 								>
-									<TaggedContent content={toolResult.content} />
+									<pre className="whitespace-pre-wrap break-words">{toolResult.content}</pre>
 								</div>
 							</div>
 						)}
