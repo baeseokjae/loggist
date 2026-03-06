@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Header } from "../components/layout/header";
 import { useCallback, useEffect, useState } from "react";
 import type { SignalRule } from "../../shared/types/domain";
 import { SignalList } from "../components/signals/signal-list";
@@ -62,7 +63,7 @@ export function SignalsPage() {
 	return (
 		<div className="space-y-6">
 			<div>
-				<h1 className="text-2xl font-bold">시그널</h1>
+				<Header title="시그널" onRefresh={() => setPage(0)} />
 				<p className="mt-1 text-sm text-muted-foreground">
 					이상 감지 규칙에 의해 발생한 알림을 확인하고 관리합니다.
 				</p>

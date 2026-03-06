@@ -59,7 +59,7 @@ export function SessionsPage() {
 
 	return (
 		<div className="space-y-6">
-			<Header title="세션 분석" />
+			<Header title="세션 분석" refreshKeys={[["sessions"], ["session-detail"]]} />
 
 			<div className="grid gap-6 lg:grid-cols-3">
 				<div className="space-y-4">

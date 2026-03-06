@@ -43,3 +43,24 @@ export async function queryLokiRange(
 		clearTimeout(timeout);
 	}
 }
+
+// 메트릭 범위 쿼리: count_over_time 등 집계 함수 결과를 시계열로 반환
+export async function queryLokiMetricRange(
+	query: string,
+	start: string,
+	end: string,
+	step: string,
+): Promise<unknown> {
+	const params = new URLSearchParams({ query, start, end, step });
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), 30_000);
+	try {
+		const res = await fetch(`${LOKI_URL}/loki/api/v1/query_range?${params}`, {
+			signal: controller.signal,
+		});
+		if (!res.ok) throw new Error(`Loki metric range query failed: ${res.status}`);
+		return await res.json();
+	} finally {
+		clearTimeout(timeout);
+	}
+}

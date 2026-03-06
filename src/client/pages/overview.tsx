@@ -30,7 +30,7 @@ export function OverviewPage() {
 
 	return (
 		<div className="space-y-6">
-			<Header title="개요" />
+			<Header title="개요" refreshKeys={[["metric"], ["metric-range"], ["cache-savings"], ["recent-errors"]]} />
 
 			<div className="grid gap-4 lg:grid-cols-4 md:grid-cols-2">
 				<KpiCard title={`${label} 비용`} value={formatUSD(cost ?? 0)} isLoading={costLoading} />

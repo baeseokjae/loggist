@@ -69,4 +69,8 @@ export interface SessionEvent {
 	prompt?: string;
 	error_message?: string;
 	status_code?: number;
+	raw?: string;
 }
+
+/** Alias for use in search/log contexts */
+export type LogEntry = SessionEvent;

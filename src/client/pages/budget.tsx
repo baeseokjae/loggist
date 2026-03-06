@@ -28,7 +28,7 @@ export function BudgetPage() {
 
 	return (
 		<div className="space-y-6">
-			<Header title="비용 예산" />
+			<Header title="비용 예산" refreshKeys={[["budgets"], ["current-spend"], ["budget-forecast"], ["budget-alerts"]]} />
 
 			<div className="grid gap-4 md:grid-cols-2">
 				<div className="rounded-xl border bg-card p-6">

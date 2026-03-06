@@ -132,7 +132,7 @@ export function ProductivityPage() {
 
 	return (
 		<div className="space-y-6">
-			<Header title="생산성" />
+			<Header title="생산성" refreshKeys={[["metric"], ["cache-savings"], ["tool-distribution"], ["model-comparison"]]} />
 
 			<div className="grid gap-4 lg:grid-cols-4 md:grid-cols-2">
 				<KpiCard
