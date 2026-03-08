@@ -121,7 +121,7 @@ sessionsRoutes.get("/:id", async (c) => {
 	const query = `{service_name="claude-code"} | session_id = "${sanitizeSessionId(sessionId)}"`;
 
 	try {
-		const result = await queryLokiRange(query, start, end, 500);
+		const result = await queryLokiRange(query, start, end, 5000, "forward");
 		const events = parseLogEntries(result);
 		const summary = computeSessionSummary(events);
 		return c.json({ data: { sessionId, events, summary } });

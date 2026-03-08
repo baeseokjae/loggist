@@ -20,8 +20,8 @@ export function useProfiles() {
 			const dynamic = res?.data?.profiles ?? [];
 			return ["all", ...dynamic.filter((p) => p !== "all")];
 		},
-		staleTime: 5 * 60 * 1000, // 5 minutes
-		refetchInterval: 5 * 60 * 1000,
+		staleTime: 2 * 60 * 1000, // 2 minutes
+		refetchInterval: 2 * 60 * 1000,
 	});
 }
 

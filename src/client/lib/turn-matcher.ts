@@ -104,14 +104,22 @@ export function buildAnnotation(turn: ConversationTurn): TelemetryAnnotation {
 	};
 }
 
-/**
- * Match JSONL ConversationGroups with telemetry ConversationTurns.
- *
- * The telemetry groupEventsIntoTurns() may produce a turn 0 that collects
- * pre-prompt events (prompt === null), while groupMessagesIntoTurns() starts
- * at the first real user message. When that offset is detected, telemetry
- * index is shifted by 1 when pairing with conversation groups.
- */
+/** Normalize text for comparison: lowercase + collapse whitespace + trim */
+function normalize(text: string): string {
+	return text.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/** Check if two texts match after normalization. For texts ≥20 chars, allow prefix matching (handles 2000-char truncation). */
+function contentMatches(a: string, b: string): boolean {
+	const na = normalize(a);
+	const nb = normalize(b);
+	if (na === nb) return true;
+	if (na.length >= 20 && nb.length >= 20) {
+		return na.startsWith(nb) || nb.startsWith(na);
+	}
+	return false;
+}
+
 export function matchTurns(
 	conversationGroups: ConversationGroup[],
 	telemetryTurns: ConversationTurn[],
@@ -128,51 +136,90 @@ export function matchTurns(
 		};
 	}
 
-	// Detect index offset: telemetry turn 0 is a pre-prompt accumulator
-	const offset =
-		telemetryTurns.length > 0 &&
-		telemetryTurns[0].prompt === null &&
-		conversationGroups.length > 0 &&
-		conversationGroups[0].userContent !== null
-			? 1
-			: 0;
+	const usedTelemetry = new Set<number>();
+	const matched = new Map<number, { telemetryIdx: number; quality: UnifiedTurn["matchQuality"] }>();
 
+	// Phase 1: Content matching
+	for (let gi = 0; gi < conversationGroups.length; gi++) {
+		const group = conversationGroups[gi];
+		if (group.userContent == null) continue;
+
+		let bestIdx = -1;
+		let bestDiff = Infinity;
+
+		const convMs = isoToMs(group.timestamp);
+
+		for (let ti = 0; ti < telemetryTurns.length; ti++) {
+			if (usedTelemetry.has(ti)) continue;
+			const turn = telemetryTurns[ti];
+			if (turn.prompt == null) continue;
+
+			if (contentMatches(group.userContent, turn.prompt)) {
+				const diff = Math.abs(convMs - nanoToMs(turn.promptTimestamp));
+				if (diff < bestDiff) {
+					bestDiff = diff;
+					bestIdx = ti;
+				}
+			}
+		}
+
+		if (bestIdx >= 0) {
+			usedTelemetry.add(bestIdx);
+			const quality: UnifiedTurn["matchQuality"] =
+				bestDiff <= FIVE_MINUTES_MS ? "exact" : "index_only";
+			matched.set(gi, { telemetryIdx: bestIdx, quality });
+		}
+	}
+
+	// Phase 2: Timestamp fallback for unmatched groups
+	for (let gi = 0; gi < conversationGroups.length; gi++) {
+		if (matched.has(gi)) continue;
+
+		const group = conversationGroups[gi];
+		const convMs = isoToMs(group.timestamp);
+
+		let bestIdx = -1;
+		let bestDiff = Infinity;
+
+		for (let ti = 0; ti < telemetryTurns.length; ti++) {
+			if (usedTelemetry.has(ti)) continue;
+			const diff = Math.abs(convMs - nanoToMs(telemetryTurns[ti].promptTimestamp));
+			if (diff < bestDiff && diff <= FIVE_MINUTES_MS) {
+				bestDiff = diff;
+				bestIdx = ti;
+			}
+		}
+
+		if (bestIdx >= 0) {
+			usedTelemetry.add(bestIdx);
+			matched.set(gi, { telemetryIdx: bestIdx, quality: "index_only" });
+		}
+	}
+
+	// Build result
 	const turns: UnifiedTurn[] = [];
 	let matchedCount = 0;
 
-	for (const group of conversationGroups) {
-		const telemetryIdx = group.index + offset;
-		const telemetryTurn =
-			telemetryIdx < telemetryTurns.length
-				? telemetryTurns[telemetryIdx]
-				: undefined;
+	for (let gi = 0; gi < conversationGroups.length; gi++) {
+		const group = conversationGroups[gi];
+		const match = matched.get(gi);
 
-		if (telemetryTurn === undefined) {
+		if (match) {
+			matchedCount++;
+			turns.push({
+				index: group.index,
+				conversation: group,
+				telemetry: buildAnnotation(telemetryTurns[match.telemetryIdx]),
+				matchQuality: match.quality,
+			});
+		} else {
 			turns.push({
 				index: group.index,
 				conversation: group,
 				telemetry: null,
 				matchQuality: "unmatched",
 			});
-			continue;
 		}
-
-		const annotation = buildAnnotation(telemetryTurn);
-
-		// Validate by timestamp proximity
-		const convMs = isoToMs(group.timestamp);
-		const telemMs = nanoToMs(telemetryTurn.promptTimestamp);
-		const diff = Math.abs(convMs - telemMs);
-		const matchQuality: UnifiedTurn["matchQuality"] =
-			diff <= FIVE_MINUTES_MS ? "exact" : "index_only";
-
-		matchedCount++;
-		turns.push({
-			index: group.index,
-			conversation: group,
-			telemetry: annotation,
-			matchQuality,
-		});
 	}
 
 	return {

@@ -207,7 +207,9 @@ function StandardBlock({
 function SegmentRenderer({ segment }: { segment: ParsedSegment }) {
 	if (segment.kind === "text") {
 		if (!segment.content) return null;
-		return <MarkdownContent content={segment.content} />;
+		return (
+			<span className="whitespace-pre-wrap">{segment.content}</span>
+		);
 	}
 
 	const style = TAG_STYLES[segment.tagName];

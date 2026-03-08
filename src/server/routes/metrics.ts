@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { ALLOWED_PERIODS, isValidProfile } from "../../shared/constants";
 import { getQueries } from "../db/queries";
 import { downsample } from "../services/downsampler";
+import { queryLokiLabelValues } from "../services/loki";
 import { queryPrometheus, queryPrometheusRange } from "../services/prometheus";
 import { buildPromQLQuery } from "../services/query-builder";
 import type { PrometheusResult } from "../../shared/types/prometheus";
@@ -289,15 +290,38 @@ metricsRoutes.get("/model-comparison", async (c) => {
 
 metricsRoutes.get("/profiles", async (c) => {
 	try {
-		const result = (await queryPrometheus(
-			`group by (profile) ({__name__=~"claude_code_.+", profile!=""})`,
-		)) as PrometheusResult;
+		// 30일 범위로 Loki 프로필 조회 (비활성 프로필도 포함)
+		const now = Math.floor(Date.now() / 1000);
+		const thirtyDaysAgo = String(now - 86400 * 30);
+		const nowStr = String(now);
+
+		// Prometheus와 Loki에서 병렬로 프로필 수집 (어느 한쪽이 실패해도 다른 쪽 결과 사용)
+		const [promResult, lokiResult] = await Promise.allSettled([
+			queryPrometheus(
+				`group by (profile) ({__name__=~"claude_code_.+", profile!=""})`,
+			),
+			queryLokiLabelValues("profile", thirtyDaysAgo, nowStr),
+		]);
 
 		const profileSet = new Set<string>();
-		for (const series of result?.data?.result ?? []) {
-			const profile = series.metric?.profile;
-			if (profile && typeof profile === "string" && profile.length > 0) {
-				profileSet.add(profile);
+
+		// Prometheus 결과에서 프로필 수집
+		if (promResult.status === "fulfilled") {
+			const result = promResult.value as PrometheusResult;
+			for (const series of result?.data?.result ?? []) {
+				const profile = series.metric?.profile;
+				if (profile && typeof profile === "string" && profile.length > 0) {
+					profileSet.add(profile);
+				}
+			}
+		}
+
+		// Loki 결과에서 프로필 수집 (Prometheus에서 누락된 비활성 프로필 보완)
+		if (lokiResult.status === "fulfilled") {
+			for (const profile of lokiResult.value) {
+				if (profile && profile.length > 0) {
+					profileSet.add(profile);
+				}
 			}
 		}
 

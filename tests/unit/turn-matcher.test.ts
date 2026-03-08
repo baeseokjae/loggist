@@ -28,7 +28,7 @@ function makeConversationGroup(
 ): ConversationGroup {
 	return {
 		index,
-		userContent: `user message ${index}`,
+		userContent: `user prompt ${index}`,
 		assistantText: `assistant response ${index}`,
 		thinkingText: null,
 		toolCalls: [],
@@ -197,9 +197,9 @@ describe("matchTurns", () => {
 	it("scenario 8: index offset correction when telemetry turn 0 has prompt === null", () => {
 		// Telemetry turn 0 is a pre-prompt accumulator (prompt === null)
 		const preTurn = makeConversationTurn(0, { prompt: null });
-		// Telemetry turns 1 and 2 are real turns
-		const realTurn1 = makeConversationTurn(1);
-		const realTurn2 = makeConversationTurn(2);
+		// Telemetry turns 1 and 2 are real turns, prompts match group content
+		const realTurn1 = makeConversationTurn(1, { prompt: "real question 0" });
+		const realTurn2 = makeConversationTurn(2, { prompt: "real question 1" });
 
 		// JSONL groups start from real user content
 		const group0 = makeConversationGroup(0, { userContent: "real question 0" });
@@ -275,6 +275,84 @@ describe("matchTurns", () => {
 		expect(annotation.inputTokens).toBe(300);
 		expect(annotation.cacheTokens).toBe(100);
 		expect(annotation.cacheEfficiency).toBeCloseTo(25, 5);
+	});
+
+	it("scenario 11: index mismatch — interrupted turn skipped, others matched by content", () => {
+		// JSONL has 4 groups (indices 0-3), but group 2 was an interrupted prompt
+		const groups = [0, 1, 2, 3].map((i) => makeConversationGroup(i));
+		// Telemetry only has turns 0, 1, 3 (turn 2 was interrupted, no telemetry)
+		const telemetry = [0, 1, 3].map((i) => makeConversationTurn(i));
+
+		const result = matchTurns(groups, telemetry);
+
+		expect(result.turns).toHaveLength(4);
+		expect(result.stats.matchedCount).toBe(3);
+		expect(result.stats.unmatchedCount).toBe(1);
+
+		// Groups 0, 1, 3 should be matched
+		expect(result.turns[0].matchQuality).toBe("exact");
+		expect(result.turns[1].matchQuality).toBe("exact");
+		expect(result.turns[2].matchQuality).toBe("unmatched");
+		expect(result.turns[2].telemetry).toBeNull();
+		expect(result.turns[3].matchQuality).toBe("exact");
+	});
+
+	it("scenario 12: truncated prompt — 3000 char prompt truncated to 2000 chars still matches", () => {
+		const longPrompt = "a]".repeat(1500); // 3000 chars
+		const truncatedPrompt = longPrompt.slice(0, 2000); // what telemetry stores
+
+		const group = makeConversationGroup(0, { userContent: longPrompt });
+		const turn = makeConversationTurn(0, { prompt: truncatedPrompt });
+
+		const result = matchTurns([group], [turn]);
+
+		expect(result.turns).toHaveLength(1);
+		expect(result.turns[0].matchQuality).toBe("exact");
+		expect(result.turns[0].telemetry).not.toBeNull();
+	});
+
+	it("scenario 13: null userContent falls back to timestamp matching", () => {
+		const group = makeConversationGroup(0, { userContent: null });
+		const turn = makeConversationTurn(0); // timestamp matches
+
+		const result = matchTurns([group], [turn]);
+
+		expect(result.turns).toHaveLength(1);
+		expect(result.turns[0].matchQuality).toBe("index_only");
+		expect(result.turns[0].telemetry).not.toBeNull();
+	});
+
+	it("scenario 14: duplicate content disambiguated by timestamp proximity", () => {
+		const sameContent = "tell me a joke";
+		// Two groups with same content but different timestamps
+		const group0 = makeConversationGroup(0, {
+			userContent: sameContent,
+			timestamp: new Date(1_700_000_000_000).toISOString(),
+		});
+		const group1 = makeConversationGroup(1, {
+			userContent: sameContent,
+			timestamp: new Date(1_700_000_060_000).toISOString(), // 60s later
+		});
+
+		// Two telemetry turns with same prompt but different timestamps
+		const turn0 = makeConversationTurn(0, {
+			prompt: sameContent,
+			promptTimestamp: msToNano(1_700_000_000_000),
+		});
+		const turn1 = makeConversationTurn(1, {
+			prompt: sameContent,
+			promptTimestamp: msToNano(1_700_000_060_000), // 60s later
+		});
+
+		const result = matchTurns([group0, group1], [turn0, turn1]);
+
+		expect(result.turns).toHaveLength(2);
+		expect(result.stats.matchedCount).toBe(2);
+		// Each group should match the telemetry turn with closest timestamp
+		expect(result.turns[0].telemetry?.telemetryIndex).toBe(0);
+		expect(result.turns[1].telemetry?.telemetryIndex).toBe(1);
+		expect(result.turns[0].matchQuality).toBe("exact");
+		expect(result.turns[1].matchQuality).toBe("exact");
 	});
 });
 
