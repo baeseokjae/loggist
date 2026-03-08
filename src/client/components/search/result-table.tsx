@@ -15,7 +15,7 @@ import {
 	DropdownMenuTrigger,
 } from "@radix-ui/react-dropdown-menu";
 import { ArrowDown, ArrowUp, ArrowUpDown, Columns3 } from "lucide-react";
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { LogEntry } from "../../../shared/types/domain";
 import { EVENT_TYPE_CONFIG } from "../../lib/constants";
@@ -99,6 +99,10 @@ function SortIcon({ column }: { column: { getIsSorted: () => false | "asc" | "de
 	if (sorted === "desc") return <ArrowDown className="inline h-3 w-3 ml-1" />;
 	return <ArrowUpDown className="inline h-3 w-3 ml-1 opacity-40" />;
 }
+
+const DEFAULT_SORTING: SortingState = [{ id: "timestamp", desc: true }];
+const coreRowModel = getCoreRowModel<LogEntry>();
+const sortedRowModel = getSortedRowModel<LogEntry>();
 
 const columnHelper = createColumnHelper<LogEntry>();
 
@@ -242,8 +246,12 @@ export const ResultTable = memo(function ResultTable({
 	sorting: externalSorting,
 	onSortingChange,
 }: ResultTableProps) {
-	const sorting: SortingState = externalSorting ?? [{ id: "timestamp", desc: true }];
+	const sorting: SortingState = externalSorting ?? DEFAULT_SORTING;
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(loadVisibility);
+
+	useEffect(() => {
+		saveVisibility(columnVisibility);
+	}, [columnVisibility]);
 
 	const table = useReactTable({
 		data: entries,
@@ -256,14 +264,12 @@ export const ResultTable = memo(function ResultTable({
 			}
 		},
 		onColumnVisibilityChange: (updater) => {
-			setColumnVisibility((prev) => {
-				const next = typeof updater === "function" ? updater(prev) : updater;
-				saveVisibility(next);
-				return next;
-			});
+			setColumnVisibility((prev) =>
+				typeof updater === "function" ? updater(prev) : updater,
+			);
 		},
-		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel(),
+		getCoreRowModel: coreRowModel,
+		getSortedRowModel: sortedRowModel,
 		manualSorting: false,
 	});
 
