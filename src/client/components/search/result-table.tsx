@@ -1,5 +1,6 @@
 import {
 	type ColumnDef,
+	type ColumnOrderState,
 	type SortingState,
 	type VisibilityState,
 	createColumnHelper,
@@ -10,11 +11,27 @@ import {
 } from "@tanstack/react-table";
 import {
 	DropdownMenu,
-	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "@radix-ui/react-dropdown-menu";
-import { ArrowDown, ArrowUp, ArrowUpDown, Columns3 } from "lucide-react";
+import {
+	DndContext,
+	type DragEndEvent,
+	KeyboardSensor,
+	PointerSensor,
+	closestCenter,
+	useSensor,
+	useSensors,
+} from "@dnd-kit/core";
+import {
+	SortableContext,
+	arrayMove,
+	sortableKeyboardCoordinates,
+	useSortable,
+	verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Columns3, GripVertical } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { LogEntry } from "../../../shared/types/domain";
@@ -23,6 +40,7 @@ import { formatNanoTimestamp, formatTokens, formatUSD } from "../../lib/format";
 import { cn } from "../../lib/utils";
 
 const COLUMN_VISIBILITY_KEY = "loggist:column-visibility";
+const COLUMN_ORDER_KEY = "loggist:column-order";
 const COLUMN_HEADER_LABELS: Record<string, string> = {
 	timestamp: "시간",
 	event_name: "이벤트",
@@ -33,6 +51,16 @@ const COLUMN_HEADER_LABELS: Record<string, string> = {
 	details: "상세",
 	session_id: "세션",
 };
+const DEFAULT_COLUMN_ORDER: ColumnOrderState = [
+	"timestamp",
+	"session_id",
+	"event_name",
+	"model",
+	"cost_usd",
+	"tokens",
+	"duration_ms",
+	"details",
+];
 
 function loadVisibility(): VisibilityState {
 	try {
@@ -45,6 +73,23 @@ function loadVisibility(): VisibilityState {
 function saveVisibility(v: VisibilityState) {
 	try {
 		localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(v));
+	} catch {}
+}
+
+function loadColumnOrder(): ColumnOrderState {
+	try {
+		const stored = localStorage.getItem(COLUMN_ORDER_KEY);
+		if (stored) {
+			const parsed = JSON.parse(stored) as ColumnOrderState;
+			if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+		}
+	} catch {}
+	return DEFAULT_COLUMN_ORDER;
+}
+
+function saveColumnOrder(order: ColumnOrderState) {
+	try {
+		localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(order));
 	} catch {}
 }
 
@@ -201,7 +246,84 @@ const columns: ColumnDef<LogEntry, unknown>[] = [
 	}) as ColumnDef<LogEntry, unknown>,
 ];
 
-function ColumnVisibilityDropdown({ table }: { table: ReturnType<typeof useReactTable<LogEntry>> }) {
+function SortableColumnItem({
+	id,
+	isVisible,
+	onToggle,
+}: {
+	id: string;
+	isVisible: boolean;
+	onToggle: () => void;
+}) {
+	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+	const style = {
+		transform: CSS.Transform.toString(transform),
+		transition,
+		opacity: isDragging ? 0.5 : 1,
+	};
+
+	return (
+		<div
+			ref={setNodeRef}
+			style={style}
+			className="flex cursor-default items-center gap-1 rounded px-1 py-1.5 text-xs hover:bg-accent"
+		>
+			<button
+				type="button"
+				className="cursor-grab touch-none p-0.5 text-muted-foreground hover:text-foreground"
+				{...attributes}
+				{...listeners}
+			>
+				<GripVertical className="h-3 w-3" />
+			</button>
+			<button
+				type="button"
+				className="flex flex-1 items-center gap-2"
+				onClick={onToggle}
+			>
+				<span
+					className={cn(
+						"flex h-3.5 w-3.5 items-center justify-center rounded-sm border",
+						isVisible
+							? "border-primary bg-primary text-primary-foreground"
+							: "border-muted-foreground/40",
+					)}
+				>
+					{isVisible && <Check className="h-2.5 w-2.5" />}
+				</span>
+				<span className={cn(!isVisible && "text-muted-foreground")}>
+					{COLUMN_HEADER_LABELS[id] ?? id}
+				</span>
+			</button>
+		</div>
+	);
+}
+
+function ColumnVisibilityDropdown({
+	table,
+	columnOrder,
+	onColumnOrderChange,
+}: {
+	table: ReturnType<typeof useReactTable<LogEntry>>;
+	columnOrder: ColumnOrderState;
+	onColumnOrderChange: (order: ColumnOrderState) => void;
+}) {
+	const sensors = useSensors(
+		useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
+		useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+	);
+
+	const handleDragEnd = (event: DragEndEvent) => {
+		const { active, over } = event;
+		if (over && active.id !== over.id) {
+			const oldIndex = columnOrder.indexOf(active.id as string);
+			const newIndex = columnOrder.indexOf(over.id as string);
+			onColumnOrderChange(arrayMove(columnOrder, oldIndex, newIndex));
+		}
+	};
+
+	const hiddenCount = table.getAllColumns().filter((col) => col.getCanHide() && !col.getIsVisible()).length;
+
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
@@ -213,25 +335,34 @@ function ColumnVisibilityDropdown({ table }: { table: ReturnType<typeof useReact
 					)}
 				>
 					<Columns3 className="h-3.5 w-3.5" />
-					열
+					열{hiddenCount > 0 && (
+						<span className="rounded-full bg-muted-foreground/20 px-1.5 text-[10px]">
+							{table.getAllColumns().filter((col) => col.getCanHide()).length - hiddenCount}/{table.getAllColumns().filter((col) => col.getCanHide()).length}
+						</span>
+					)}
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent
-				className="z-50 min-w-[140px] rounded-md border bg-popover p-1 shadow-md"
+				className="z-50 min-w-[160px] rounded-md border bg-popover p-1 shadow-md"
 				align="end"
 				sideOffset={4}
+				onCloseAutoFocus={(e) => e.preventDefault()}
 			>
-				{table.getAllColumns().filter((col) => col.getCanHide()).map((col) => (
-					<DropdownMenuCheckboxItem
-						key={col.id}
-						checked={col.getIsVisible()}
-						onCheckedChange={(v) => col.toggleVisibility(!!v)}
-						onSelect={(e) => e.preventDefault()}
-						className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent"
-					>
-						{COLUMN_HEADER_LABELS[col.id] ?? col.id}
-					</DropdownMenuCheckboxItem>
-				))}
+				<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+					<SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
+						{columnOrder
+							.map((colId) => table.getAllColumns().find((c) => c.id === colId))
+							.filter((col) => col?.getCanHide())
+							.map((col) => (
+								<SortableColumnItem
+									key={col!.id}
+									id={col!.id}
+									isVisible={col!.getIsVisible()}
+									onToggle={() => col!.toggleVisibility(!col!.getIsVisible())}
+								/>
+							))}
+					</SortableContext>
+				</DndContext>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);
@@ -248,15 +379,20 @@ export const ResultTable = memo(function ResultTable({
 }: ResultTableProps) {
 	const sorting: SortingState = externalSorting ?? DEFAULT_SORTING;
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(loadVisibility);
+	const [columnOrder, setColumnOrder] = useState<ColumnOrderState>(loadColumnOrder);
 
 	useEffect(() => {
 		saveVisibility(columnVisibility);
 	}, [columnVisibility]);
 
+	useEffect(() => {
+		saveColumnOrder(columnOrder);
+	}, [columnOrder]);
+
 	const table = useReactTable({
 		data: entries,
 		columns,
-		state: { sorting, columnVisibility },
+		state: { sorting, columnVisibility, columnOrder },
 		onSortingChange: (updater) => {
 			if (onSortingChange) {
 				const next = typeof updater === "function" ? updater(sorting) : updater;
@@ -265,6 +401,11 @@ export const ResultTable = memo(function ResultTable({
 		},
 		onColumnVisibilityChange: (updater) => {
 			setColumnVisibility((prev) =>
+				typeof updater === "function" ? updater(prev) : updater,
+			);
+		},
+		onColumnOrderChange: (updater) => {
+			setColumnOrder((prev) =>
 				typeof updater === "function" ? updater(prev) : updater,
 			);
 		},
@@ -297,7 +438,7 @@ export const ResultTable = memo(function ResultTable({
 					<span className="font-medium text-foreground">{entries.length}건</span>
 					<span>· 로드된 {entries.length}건 내에서 정렬됨</span>
 				</div>
-				<ColumnVisibilityDropdown table={table} />
+				<ColumnVisibilityDropdown table={table} columnOrder={columnOrder} onColumnOrderChange={setColumnOrder} />
 			</div>
 
 			<div className={cn(
