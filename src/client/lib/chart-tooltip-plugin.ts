@@ -23,7 +23,7 @@ function defaultFormatter(value: number | null | undefined): string {
  *   and the 1-based series index (matches u.series index). Falls back to a simple
  *   String() conversion when not provided.
  */
-export function tooltipPlugin(formatValue?: ValueFormatter): uPlot.Plugin {
+export function tooltipPlugin(formatValue?: ValueFormatter, rawData?: uPlot.AlignedData): uPlot.Plugin {
 	let tooltipEl: HTMLDivElement | null = null;
 
 	const fmt = formatValue ?? ((v) => defaultFormatter(v));
@@ -62,7 +62,9 @@ export function tooltipPlugin(formatValue?: ValueFormatter): uPlot.Plugin {
 					// Skip hidden series
 					if (!s.show) continue;
 
-					const raw = (u.data[i] as (number | null)[])[idx];
+					const dataSource = rawData ?? u.data;
+					const raw = (dataSource[i] as (number | null)[])[idx];
+					if (raw == null || raw === 0) continue;
 					const color = (s.stroke as string) ?? "#fff";
 					const label = s.label ?? `Series ${i}`;
 					const valueStr = fmt(raw, i);
@@ -96,8 +98,19 @@ export function tooltipPlugin(formatValue?: ValueFormatter): uPlot.Plugin {
 						: cursorLeft + OFFSET;
 
 				tooltipEl.style.left = `${Math.max(0, leftPos)}px`;
-				// Vertically anchor near the top of the plot area
-				tooltipEl.style.top = "12px";
+
+				// Dynamic vertical positioning: place tooltip away from cursor
+				const cursorTop = u.cursor.top ?? 0;
+				const chartHeight = u.bbox.height / devicePixelRatio;
+				const tipHeight = tooltipEl.offsetHeight || 80;
+				const VERTICAL_OFFSET = 12;
+
+				if (cursorTop < chartHeight / 2) {
+					tooltipEl.style.top = `${Math.min(cursorTop + VERTICAL_OFFSET, chartHeight - tipHeight)}px`;
+				} else {
+					tooltipEl.style.top = `${Math.max(0, cursorTop - tipHeight - VERTICAL_OFFSET)}px`;
+				}
+
 				tooltipEl.style.display = "block";
 			},
 		},

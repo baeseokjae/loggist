@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import uPlot from "uplot";
 import { tooltipPlugin } from "../../lib/chart-tooltip-plugin";
-import { buildAlignedData } from "../../lib/chart-utils";
+import { buildAlignedData, buildStackedData, getChartColors } from "../../lib/chart-utils";
 import { EVENT_TYPE_CONFIG } from "../../lib/constants";
 import { ChartContainer } from "../charts/chart-container";
 import { UPlotWrapper } from "../charts/uplot-wrapper";
@@ -18,11 +18,13 @@ interface VolumeChartProps {
 }
 
 export function VolumeChart({ data, isLoading, isError, start, end }: VolumeChartProps) {
-	const chartData = useMemo(() => buildAlignedData(data ?? []), [data]);
+	const alignedData = useMemo(() => buildAlignedData(data ?? []), [data]);
+	const { stackedData: chartData, bands } = useMemo(() => buildStackedData(alignedData), [alignedData]);
 
 	const hasData = data.length > 0 && chartData.length > 1 && (chartData[0] as number[]).length > 0;
 
 	const options = useMemo((): Partial<uPlot.Options> => {
+		const colors = getChartColors();
 		const series: uPlot.Series[] = [
 			{}, // x-axis
 			...data.map((s) => {
@@ -31,8 +33,8 @@ export function VolumeChart({ data, isLoading, isError, start, end }: VolumeChar
 				return {
 					label: EVENT_TYPE_CONFIG[eventName]?.label ?? eventName,
 					stroke: color,
-					fill: color + "80",
-					width: 0,
+					fill: color + "CC",
+					width: 1,
 					paths: (u: uPlot, seriesIdx: number, idx0: number, idx1: number) => {
 						return uPlot.paths.bars!({ size: [0.8, 64] })(u, seriesIdx, idx0, idx1);
 					},
@@ -43,20 +45,21 @@ export function VolumeChart({ data, isLoading, isError, start, end }: VolumeChar
 		];
 
 		return {
-			height: 200,
+			height: 280,
 			series,
+			bands,
 			axes: [
 				{
-					stroke: "#9ca3af",
-					grid: { stroke: "rgba(255,255,255,0.07)", width: 1 },
-					ticks: { show: false },
+					stroke: colors.foreground,
+					grid: { stroke: colors.border, width: 1 },
+					ticks: { stroke: colors.border, width: 1 },
 					gap: 8,
 				},
 				{
-					stroke: "#9ca3af",
+					stroke: colors.foreground,
 					size: 44,
-					grid: { stroke: "rgba(255,255,255,0.07)", width: 1 },
-					ticks: { show: false },
+					grid: { stroke: colors.border, width: 1 },
+					ticks: { stroke: colors.border, width: 1 },
 					gap: 8,
 					values: (_u, vals) => vals.map((v) => (v != null ? String(Math.round(Number(v))) : "")),
 				},
@@ -71,8 +74,8 @@ export function VolumeChart({ data, isLoading, isError, start, end }: VolumeChar
 					},
 				},
 			},
-			legend: { show: false },
-			plugins: [tooltipPlugin((v) => (v != null ? String(Math.round(v)) : "-"))],
+			legend: { show: true },
+			plugins: [tooltipPlugin((v) => (v != null ? String(Math.round(v)) : "-"), alignedData)],
 			cursor: {
 				show: true,
 				x: true,

@@ -180,3 +180,47 @@ export function buildPerStepModelData(
 		models: indices.map((i) => models[i]),
 	};
 }
+
+/** Transform aligned data into stacked form for bar charts.
+ *  Each series[i] becomes the cumulative sum of series[1..i].
+ *  Returns the stacked data and the band definitions for uPlot. */
+export function buildStackedData(
+	data: uPlot.AlignedData,
+): { stackedData: uPlot.AlignedData; bands: uPlot.Band[] } {
+	if (data.length <= 2) {
+		return { stackedData: data, bands: [] };
+	}
+
+	const timestamps = data[0] as number[];
+	const numSeries = data.length - 1;
+	const len = timestamps.length;
+
+	const stacked: (number | null)[][] = [];
+
+	const first = (data[1] as (number | null)[]).slice();
+	stacked.push(first);
+
+	for (let s = 1; s < numSeries; s++) {
+		const current = data[s + 1] as (number | null)[];
+		const below = stacked[s - 1];
+		const cumulative: (number | null)[] = new Array(len);
+		for (let i = 0; i < len; i++) {
+			const curVal = current[i] ?? 0;
+			const belowVal = below[i] ?? 0;
+			cumulative[i] = curVal + belowVal;
+		}
+		stacked.push(cumulative);
+	}
+
+	const bands: uPlot.Band[] = [];
+	for (let s = numSeries; s > 1; s--) {
+		bands.push({
+			series: [s, s - 1] as uPlot.Band.Bounds,
+		});
+	}
+
+	return {
+		stackedData: [timestamps, ...stacked] as uPlot.AlignedData,
+		bands,
+	};
+}
